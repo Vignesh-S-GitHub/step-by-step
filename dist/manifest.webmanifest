@@ -6,8 +6,8 @@
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#11121a",
-  "theme_color": "#11121a",
+  "background_color": "#190834",
+  "theme_color": "#190834",
   "icons": [
     {
       "src": "assets/rising-steps-192.png",
