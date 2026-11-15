@@ -1,8 +1,9 @@
 const PREFIX = 'little-step-shell-';
-const CACHE = PREFIX + 'v9';
+const CACHE = PREFIX + 'v10';
 const root = self.registration.scope;
+const threeUrl = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.1/three.module.min.js';
 const shell = [
-  './', './style.css', './app.mjs', './model.mjs', './core.mjs', './prism.mjs', './manifest.webmanifest',
+  './', './style.css', './app.mjs', './model.mjs', './cosmicLadder.js', './manifest.webmanifest',
   './assets/rising-steps.svg', './assets/rising-steps-180.png', './assets/rising-steps-192.png',
   './assets/rising-steps-512.png', './assets/rising-steps-maskable.png', './assets/inter.woff2',
 ].map((path) => new URL(path, root).href);
@@ -20,6 +21,12 @@ self.addEventListener('install', (event) => {
     }));
     const cache = await caches.open(CACHE);
     await Promise.all(responses.map(([url, response]) => cache.put(url, response)));
+    try {
+      const three = await fetch(threeUrl, { mode: 'cors', signal: AbortSignal.timeout(2500) });
+      if (three.ok) await cache.put(threeUrl, three);
+    } catch {
+      // The local app remains installable if the optional renderer is unavailable.
+    }
     await self.skipWaiting();
   })());
 });
@@ -35,15 +42,25 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const request = event.request;
   if (request.method !== 'GET') return;
-  const navigation = request.mode === 'navigate' && request.url === root;
-  if (!navigation && !files.has(request.url)) return;
+  const navigation = request.mode === 'navigate' && request.url.split(/[?#]/, 1)[0] === root;
+  const renderer = request.url === threeUrl;
+  if (!navigation && !renderer && !files.has(request.url)) return;
 
   event.respondWith((async () => {
+    const cache = await caches.open(CACHE);
+    if (renderer) {
+      const stored = await cache.match(threeUrl);
+      if (stored) return stored;
+      const response = await fetch(request);
+      if (response.ok) {
+        try { await cache.put(threeUrl, response.clone()); } catch { /* Storage is optional. */ }
+      }
+      return response;
+    }
     try {
       return await fetch(request);
     } catch {
-      const cache = await caches.open(CACHE);
-      return (await cache.match(request.url)) || Response.error();
+      return (await cache.match(navigation ? root : request.url)) || Response.error();
     }
   })());
 });

@@ -1,6 +1,5 @@
-import { bindPrism, initialOrientation } from './prism.mjs';
-import { coreArtwork, animateCore } from './core.mjs';
-import { TARGET_SESSIONS, dayKey, shiftDay, weekDays, scheduled, entry, logSession, removeLog, deleteHabit, nextTarget, coreCharge, coreEvolution, mastery, milestones, remaining } from './model.mjs';
+import { mount as mountLadder } from './cosmicLadder.js';
+import { TARGET_SESSIONS, dayKey, shiftDay, weekDays, scheduled, entry, logSession, removeLog, deleteHabit, nextTarget, dayCompletion, mastery, remaining, mergeBackup, normalizeGoldenSteps, stepsPerZone, zoneIndex, zones } from './model.mjs';
 
 const icons = {
   today: '<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M16 3v4M8 3v4M3 10h18"/><path d="m9 15 2 2 4-4"/>',
@@ -34,7 +33,6 @@ const categories = { movement: 'Movement', read: 'Reading', calm: 'Mindfulness',
 const weekdays = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 const repeatDays = [[1,'Mo'],[2,'Tu'],[3,'We'],[4,'Th'],[5,'Fr'],[6,'Sa'],[0,'Su']];
 const routes = { today: 'Today', habits: 'Habits', progress: 'Progress' };
-const coreRanks = ['Dormant', 'Spark', 'Prism', 'Radiant', 'Nova', 'Ascended'];
 
 const themeKey = 'little-step-theme';
 const themes = { amethyst: 'Amethyst', lagoon: 'Lagoon', dusk: 'Dusk', orbit: 'Orbit' };
@@ -43,7 +41,6 @@ const pickers = {
   step: { label: 'Increase by', options: [0, 1, 2, 5, 10].map((step) => [String(step), step ? step + ' min' : 'Keep current']) },
   theme: { label: 'Theme', options: Object.entries(themes) },
 };
-const orientation = { ...initialOrientation };
 let theme = 'amethyst';
 
 function applyTheme(choice, persist = false) {
@@ -66,10 +63,6 @@ try {
   applyTheme('amethyst');
 }
 
-function rankName(level) {
-  return coreRanks[level] ?? `Ascended ${level - 4}`;
-}
-
 // Keep the original storage key so existing habits and history carry over.
 const key = 'cairn-personal-habits-v1';
 const screen = document.querySelector('#screen');
@@ -81,9 +74,7 @@ picker.setAttribute('aria-labelledby', 'picker-title');
 sheet.after(picker);
 let pickerTrigger;
 const toast = document.querySelector('#toast');
-const coreObserver = new IntersectionObserver(([entry]) => {
-  entry.target.classList.toggle('core-idle-paused', !entry.isIntersecting);
-});
+let ladder;
 let today = dayKey();
 let selected = today;
 let progressWeek = today;
@@ -97,7 +88,11 @@ const standalone = matchMedia("(display-mode: standalone)").matches || navigator
 function load() {
   try {
     const stored = localStorage.getItem(key);
-    if (stored) return JSON.parse(stored);
+    if (stored) {
+      const existing = JSON.parse(stored);
+      existing.goldenSteps = normalizeGoldenSteps(existing.goldenSteps, existing.logs.length);
+      return existing;
+    }
     const initial = initialState();
     localStorage.setItem(key, JSON.stringify(initial));
     return initial;
@@ -115,6 +110,7 @@ function initialState() {
       starter('breathe', 'Mindful breathing', 'calm', 5),
     ],
     logs: [],
+    goldenSteps: [],
     timer: null,
   };
 }
@@ -189,36 +185,36 @@ function dateStrip() {
 }
 
 function chargeFor(day) {
-  return coreCharge(state.logs, day, scheduled(state.habits, day).length);
+  return dayCompletion(state.logs, day, scheduled(state.habits, day).length);
 }
 
-function coreCard(day) {
-  const charge = chargeFor(day);
-  const total = state.logs.length;
-  const evolution = coreEvolution(total);
-  const distance = evolution.next - total;
-  const status = charge.done && charge.done === charge.total ? 'Fully charged' : `${charge.done} of ${charge.total} sessions`;
-  return `<section class="core-card" aria-labelledby="core-title" data-charge="${charge.done}" data-rank="${evolution.level}">
-    <div class="core-copy">
-      <button class="core-rank" data-action="core-info" aria-label="Core rank details: ${rankName(evolution.level)}">${icon('spark', 13)} ${rankName(evolution.level)}</button>
-      <h2 id="core-title">Momentum Core</h2>
-      <p>${day === today ? 'Today’s charge' : 'Daily charge'} <strong>${status}</strong></p>
-      <div class="charge-track" aria-hidden="true"><span style="--charge:${charge.ratio}"></span></div>
-      <span class="core-caption">${countLabel(distance, 'session')} to <strong>${rankName(evolution.level + 1)}</strong></span>
+function ladderCard() {
+  return `<section class="ladder-card" aria-labelledby="ladder-title">
+    <button class="ladder-stage" aria-disabled="true" type="button" aria-label="Cosmic Ladder" aria-describedby="ladder-controls">
+      <span class="ladder-fallback" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><b></b></span>
+    </button>
+    <div class="ladder-copy">
+      <h2 id="ladder-title">Cosmic Ladder</h2>
+      <p class="ladder-zone" data-ladder-label="zone"></p>
+      <strong class="ladder-count" data-ladder-label="count"></strong>
+      <p class="ladder-charge" data-ladder-charge></p>
     </div>
-    <button class="core-art" type="button" data-action="pulse-core" aria-label="Interact with the Momentum Core" aria-describedby="core-controls">${coreArtwork(charge, evolution.level, orientation)}</button>
-    <span class="core-guide" id="core-controls" title="Arrow keys to rotate. Home to reset. Enter to pulse.">${icon('rotate', 14)} Drag to rotate</span>
+    <button class="icon-button ladder-route" data-action="ladder-info" aria-label="Cosmic Ladder journey">${icon('spark', 18)}</button>
+    <span class="ladder-guide" id="ladder-controls">${icon('rotate', 13)} Drag to rotate</span>
   </section>`;
 }
 
-function coreInfo() {
-  const evolution = coreEvolution(state.logs.length);
-  openSheet('Core ranks', 'Each session charges the core for the day. Lifetime sessions unlock new facets and effects.', `
-    <ol class="core-rank-list">${[...milestones, evolution.level >= 6 ? evolution.next : 50].map((threshold) => {
-      const level = coreEvolution(threshold).level;
-      return `<li><span>${icon(evolution.level >= level ? 'check' : 'spark', 16)} ${rankName(level)}</span><small>${countLabel(threshold, 'session')}</small></li>`;
-    }).join('')}</ol>
-    <button class="subtle full-button" data-action="close">Done</button>`);
+function journey() {
+  return `<ol class="ladder-journey">${zones.slice(0, -1).map(({ name, distance }, index) => `<li class="${zoneIndex(state.logs.length) === index ? 'current' : ''}">
+    ${icon(state.logs.length >= index * stepsPerZone ? 'check' : 'spark', 15)}
+    <span>${name}<small>${distance}</small></span>
+    <small>${countLabel(index * stepsPerZone, 'step')}</small>
+  </li>`).join('')}</ol>`;
+}
+
+function ladderInfo() {
+  openSheet('Cosmic Ladder journey', 'Every completed session adds a step. A new zone opens every eight steps.', `
+    ${journey()}<button class="subtle full-button" data-action="close">Done</button>`);
 }
 
 function skillLabel(habit, manage) {
@@ -250,7 +246,7 @@ function todayScreen() {
   const suggestion = selected === today && habits.find((habit) => nextTarget(state, habit));
   const allDone = habits.length > 0 && habits.every((habit) => entry(state, habit.id, selected));
   const currentCount = selected === today ? habits.filter((habit) => entry(state, habit.id, selected)).length : completed;
-  return `${dateStrip()}${coreCard(selected)}
+  return `${dateStrip()}<div data-ladder-slot></div>
     <section class="habit-section" aria-labelledby="activity-title">
       <div class="section-title"><h2 id="activity-title">${selected === today ? 'Daily activities' : 'Activity log'}</h2><span class="completion ${allDone ? 'all-done' : ''}">${allDone ? icon('check', 15) : ''}${currentCount} / ${visible.length} done</span></div>
       ${suggestion ? `<button class="suggestion" data-action="raise" data-id="${suggestion.id}">${icon('up', 16)}<span><strong>${safe(suggestion.name)}</strong> is ready for ${nextTarget(state, suggestion)} min</span>${icon('chevron', 17)}</button>` : ''}
@@ -269,7 +265,7 @@ function habitsScreen() {
 
 function progressScreen() {
   const total = state.logs.length;
-  const evolution = coreEvolution(total);
+  const zone = zones[zoneIndex(total)];
   const days = weekDays(progressWeek);
   const first = days[0];
   const last = days[6];
@@ -277,21 +273,25 @@ function progressScreen() {
   const max = Math.max(1, ...weeklyCounts);
   const minutes = state.logs.reduce((sum, log) => sum + log.minutes, 0);
   const monthDay = { month: 'short', day: 'numeric' };
-  return `<div class="progress-grid">${coreCard(today)}
+  return `<div class="progress-grid">
     <section class="week-report" aria-labelledby="week-title">
       <div class="section-title"><h2 id="week-title">Weekly activity</h2><div class="week-actions">
       <button class="icon-button" data-action="week-prev" aria-label="Previous week">${icon('left', 20)}</button><button class="icon-button" data-action="week-next" aria-label="Next week" ${last >= today ? 'disabled' : ''}>${icon('chevron', 20)}</button></div></div>
       <p>${dateLabel(first, monthDay)} – ${dateLabel(last, monthDay)}</p>
       <div class="chart" aria-label="Sessions completed each day">${weeklyCounts.map((count, i) => `<div class="chart-column" aria-label="${dateLabel(days[i], { weekday: 'long' })}, ${countLabel(count, 'session')}"><span class="bar-count">${count || '–'}</span><span class="bar-track"><i style="--height:${count / max}"></i></span><span>${weekdays[i]}</span></div>`).join('')}</div>
     </section>
-    <section class="totals" aria-label="All-time activity"><div><strong>${total}</strong><span>Sessions</span></div><div><strong>${minutes}</strong><span>Minutes</span></div><div><strong>${evolution.level}</strong><span>Core rank</span></div></section>
-    <section class="collection" aria-labelledby="rank-title"><div class="section-title"><h2 id="rank-title">Core ranks</h2><span class="completion">${rankName(evolution.level)}</span></div><ol class="collection-ranks">${milestones.map((threshold, i) => `<li class="${total >= threshold ? 'earned' : threshold === evolution.next ? 'next-rank' : ''}"><span>${icon(total >= threshold ? 'check' : 'spark', 15)}</span><small>${rankName(i + 1)}</small><b aria-label="${countLabel(threshold, 'session')}">${threshold}</b></li>`).join('')}</ol></section>
+    <section class="totals" aria-label="All-time activity"><div><strong>${total}</strong><span>Sessions</span></div><div><strong>${minutes}</strong><span>Minutes</span></div><div><strong>${state.goldenSteps.length}</strong><span>Golden steps</span></div></section>
+    <section class="collection" aria-labelledby="journey-title"><div class="section-title"><h2 id="journey-title">Cosmic Ladder</h2>${zone.name ? `<span class="completion">${zone.name}</span>` : ''}</div>${journey()}</section>
   </div>`;
 }
 
 function render({ resetScroll = false } = {}) {
-  coreObserver.disconnect();
-  const todayCharge = coreCharge(state.logs, today, scheduled(state.habits, today).length);
+  const existingLadder = screen.querySelector('.ladder-card');
+  if (route !== 'today' && ladder) {
+    ladder.destroy();
+    ladder = undefined;
+  }
+  const todayCharge = dayCompletion(state.logs, today, scheduled(state.habits, today).length);
   document.documentElement.style.setProperty('--momentum', String(todayCharge.ratio));
   navigation();
   document.querySelector('#screen-title').textContent = routes[route];
@@ -302,10 +302,15 @@ function render({ resetScroll = false } = {}) {
   screen.dataset.route = route;
   const scrollAt = resetScroll ? 0 : (screen.querySelector('.habit-list')?.scrollTop || 0);
   screen.innerHTML = ({ today: todayScreen, habits: habitsScreen, progress: progressScreen })[route]();
-  const core = screen.querySelector('.core-card');
-  if (core) {
-    coreObserver.observe(core);
-    bindPrism(core.querySelector('.core-art'), orientation);
+  if (route === 'today') {
+    const slot = screen.querySelector('[data-ladder-slot]');
+    if (existingLadder) slot.replaceWith(existingLadder);
+    else slot.outerHTML = ladderCard();
+    const card = screen.querySelector('.ladder-card');
+    const charge = chargeFor(selected);
+    card.querySelector('[data-ladder-charge]').textContent = (selected === today ? 'Today' : 'Selected day') + ' · ' + charge.done + ' / ' + charge.total + ' sessions';
+    ladder ??= mountLadder(card);
+    ladder.setProgress(state.logs.length, state.goldenSteps);
   }
   if (scrollAt && screen.querySelector('.habit-list')) screen.querySelector('.habit-list').scrollTop = scrollAt;
   if (resetScroll) screen.scrollTop = 0;
@@ -441,25 +446,33 @@ function updateTimer(force = false) {
 
 function complete(habit, fromTimer = false) {
   if (!scheduled([habit], today).length) return;
-  const before = coreEvolution(state.logs.length);
-  const beforeCharge = chargeFor(today);
   const beforeSkill = mastery(state.logs, habit.id).level;
   const minutes = fromTimer ? state.timer.minutes : habit.minutes;
-  if (!logSession(state, habit.id, today, minutes)) return;
-  if (state.timer?.id === habit.id) state.timer = null;
+  const golden = Math.random() < 1 / 6;
+  const candidate = { ...state, logs: [...state.logs], goldenSteps: [...state.goldenSteps] };
+  if (!logSession(candidate, habit.id, today, minutes, golden)) return;
+  if (candidate.timer?.id === habit.id) candidate.timer = null;
+  if (!save(candidate)) return;
+  state = candidate;
   undoLog = { id: habit.id, day: today };
-  save();
   if (sheet.open) sheet.close();
+  ladder?.addStep(golden);
   render();
-  const after = coreEvolution(state.logs.length);
-  const afterCharge = chargeFor(today);
   const afterSkill = mastery(state.logs, habit.id).level;
-  animateCore(document.querySelector('.core-card'), beforeCharge, afterCharge);
-  let message = afterCharge.ratio === 1 ? 'Core fully charged for today.' : 'Core charged · Session logged.';
-  if (after.level > before.level) message = `${rankName(after.level)} core unlocked!`;
+  let message = golden ? 'Golden step added!' : 'Session logged. One step higher.';
   if (afterSkill > beforeSkill) message += ` · Skill level ${afterSkill}`;
   say(message, true);
   screen.querySelector(`[data-action="toggle"][data-id="${habit.id}"]`)?.focus({ preventScroll: true });
+}
+
+function removeCompletion(id, day) {
+  const candidate = { ...state };
+  if (!removeLog(candidate, id, day) || !save(candidate)) return false;
+  state = candidate;
+  if (undoLog?.id === id && undoLog.day === day) undoLog = null;
+  render();
+  say('Session removed.');
+  return true;
 }
 
 function settings() {
@@ -467,7 +480,9 @@ function settings() {
     ${pickerField('theme', theme)}
     <div class="settings-detail">${icon('today', 21)}<div><strong>Daily check-in</strong><p>Open Step by Step to see today’s activities and any available target increases.</p></div></div>
     ${standalone ? '' : '<button class="primary full-button" data-action="install">Install Step by Step</button>'}
-    <button class="subtle full-button" data-action="export">Download activity data</button>`);
+    <button class="subtle full-button" data-action="export">Download activity data</button>
+    <button class="subtle full-button" data-action="import">Import activity data</button>
+    <input type="file" id="backup-file" accept=".json,application/json" hidden>`, 'settings');
 }
 
 async function installApp() {
@@ -492,12 +507,38 @@ async function installApp() {
 }
 
 function exportData() {
-  const url = URL.createObjectURL(new Blob([JSON.stringify({ habits: state.habits, logs: state.logs }, null, 2)], { type: 'application/json' }));
+  const url = URL.createObjectURL(new Blob([JSON.stringify({ habits: state.habits, logs: state.logs, goldenSteps: state.goldenSteps }, null, 2)], { type: 'application/json' }));
   const link = document.createElement('a');
   link.href = url;
   link.download = `step-by-step-${today}.json`;
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+async function importData(input) {
+  const file = input.files[0];
+  if (!file) return;
+  input.value = '';
+  try {
+    if (file.size > 12 * 1024 * 1024) throw new Error('This backup is too large for browser storage.');
+    const backup = JSON.parse(await file.text());
+    const before = state.logs.length;
+    const next = mergeBackup(state, backup);
+    if (!save(next)) {
+      throw new Error('Could not save the backup. Existing activity data was kept.');
+    }
+    state = next;
+    if (sheet.open && sheet.dataset.kind === 'settings') sheet.close();
+    render();
+    say(next.logs.length === before ? 'Backup merged.' : `Imported ${countLabel(next.logs.length - before, 'session')}.`);
+  } catch (error) {
+    const message = error instanceof SyntaxError ? 'Choose a valid Step by Step JSON backup.' : error.message;
+    if (sheet.open && sheet.dataset.kind === 'settings') {
+      const feedback = sheet.querySelector('.sheet-header p');
+      feedback.setAttribute('role', 'alert');
+      feedback.textContent = message;
+    } else say(message);
+  }
 }
 
 function syncDay() {
@@ -549,6 +590,10 @@ document.addEventListener('submit', (event) => {
 });
 
 document.addEventListener('change', (event) => {
+  if (event.target.id === 'backup-file') {
+    void importData(event.target);
+    return;
+  }
   if (event.target.name === 'theme') {
     applyTheme(event.target.value, true);
     return;
@@ -622,22 +667,14 @@ document.addEventListener('click', (event) => {
       break;
     case 'toggle':
       if (entry(state, id, today)) {
-        removeLog(state, id, today);
-        save();
-        render();
-        say('Session removed.');
+        if (!removeCompletion(id, today)) return;
         screen.querySelector(`[data-action="toggle"][data-id="${id}"]`)?.focus({ preventScroll: true });
       } else {
         complete(habit);
       }
       break;
     case 'undo':
-      if (!undoLog) return;
-      removeLog(state, undoLog.id, undoLog.day);
-      undoLog = null;
-      save();
-      render();
-      say('Session removed.');
+      if (undoLog) removeCompletion(undoLog.id, undoLog.day);
       break;
     case 'raise': {
       const target = nextTarget(state, habit);
@@ -719,15 +756,11 @@ document.addEventListener('click', (event) => {
       say('Habit restored.');
       break;
     }
-    case 'core-info': coreInfo(); break;
-    case 'pulse-core': {
-      const card = trigger.closest('.core-card');
-      animateCore(card);
-      break;
-    }
+    case 'ladder-info': ladderInfo(); break;
     case 'settings': settings(); break;
     case 'install': void installApp(); break;
     case 'export': exportData(); break;
+    case 'import': sheet.querySelector('#backup-file').click(); break;
   }
 });
 

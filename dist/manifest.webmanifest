@@ -2,7 +2,7 @@
   "id": "./",
   "name": "Step by Step",
   "short_name": "Step by Step",
-  "description": "A daily habit tracker with short sessions and an animated Momentum Core.",
+  "description": "Build small daily habits and climb the Cosmic Ladder one session at a time.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

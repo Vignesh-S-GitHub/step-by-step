@@ -24,6 +24,7 @@ jobs:
       - name: Check app modules
         run: |
           for file in dist/*.mjs dist/sw.js; do node --check "$file" || exit 1; done
+          node --input-type=module --check < dist/cosmicLadder.js
       - name: Verify habit logic
         run: node --test tests/*.test.mjs
       - uses: actions/configure-pages@v5

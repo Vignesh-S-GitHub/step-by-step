@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { dayKey, scheduled, logSession, removeLog, deleteHabit, entry, nextTarget, coreCharge, remaining, weekDays } from '../dist/model.mjs';
+import { dayKey, scheduled, logSession, removeLog, deleteHabit, entry, nextTarget, dayCompletion, remaining, weekDays, mergeBackup, zoneIndex, zones } from '../dist/model.mjs';
 
 test('date helpers give predictable local dates', () => {
   assert.equal(dayKey(new Date(2026, 10, 15, 12)), '2026-11-15');
@@ -42,8 +42,8 @@ test('optional growth is offered only after five target sessions', () => {
   assert.equal(nextTarget(state,habit),10);
 });
 
-test('crystal charge and countdown are bounded', () => {
-  assert.equal(coreCharge([{id:'h',day:'2026-11-15'}],'2026-11-15',2).ratio,.5);
+test('day completion and countdown are bounded', () => {
+  assert.equal(dayCompletion([{id:'h',day:'2026-11-15'}],'2026-11-15',2).ratio,.5);
   assert.equal(remaining({endsAt:5000,remainingMs:10000},6000),0);
 });
 
@@ -60,4 +60,37 @@ test('deleting an active or archived habit removes only its history and timer', 
     assert.equal(deleteHabit(state, keptHabit.id).timer, state.timer);
     assert.equal(deleteHabit(state, 'missing'), state);
   }
+});
+
+test('golden steps stay attached to their session when earlier logs are removed', () => {
+  const state = { habits: [{ id: 'a' }, { id: 'b' }], logs: [], goldenSteps: [] };
+  logSession(state, 'a', '2026-11-12', 5, false);
+  logSession(state, 'a', '2026-11-13', 5, true);
+  logSession(state, 'b', '2026-11-13', 5, true);
+  assert.deepEqual(state.goldenSteps, [2, 3]);
+  assert.equal(logSession(state, 'b', '2026-11-13', 5, true), false);
+  removeLog(state, 'a', '2026-11-12');
+  assert.deepEqual(state.goldenSteps, [1, 2]);
+  assert.deepEqual(deleteHabit(state, 'a').goldenSteps, [1]);
+});
+
+test('backup merge deduplicates sessions, remaps golden steps and accepts legacy files', () => {
+  const makeHabit = (id) => ({ id, name: id, category: 'other', minutes: 5, step: 0, cap: 5, created: '2026-11-01', targetSince: '2026-11-01' });
+  const existingLog = { id: 'a', day: '2026-11-15', minutes: 5 };
+  const newLog = { id: 'b', day: '2026-11-14', minutes: 5 };
+  const state = { habits: [makeHabit('a')], logs: [existingLog], goldenSteps: [], timer: null };
+  const backup = { habits: [makeHabit('a'), makeHabit('b')], logs: [newLog, existingLog], goldenSteps: [1] };
+  const merged = mergeBackup(state, backup);
+  assert.deepEqual(merged.logs, [existingLog, newLog]);
+  assert.deepEqual(merged.goldenSteps, [2]);
+  assert.deepEqual(mergeBackup(merged, backup), merged);
+  assert.deepEqual(mergeBackup(state, { habits: [], logs: [] }), state);
+  assert.throws(() => mergeBackup(state, { habits: [], logs: [newLog] }));
+  assert.throws(() => mergeBackup(state, { habits: [makeHabit('"><svg')], logs: [] }));
+});
+
+test('zones unlock at eight-session intervals and debug preview stays separate', () => {
+  assert.deepEqual([0, 7, 8, 39, 40, 63, 64, 30000].map(zoneIndex), [0, 0, 1, 4, 5, 7, 8, 8]);
+  assert.equal(zones[4].name, 'The Moon');
+  assert.equal(zones[8].name, '');
 });

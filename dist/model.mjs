@@ -32,15 +32,16 @@ export function entry(state, id, day) {
   return state.logs.find((log) => log.id === id && log.day === day);
 }
 
-export function logSession(state, id, day, minutes) {
+export function logSession(state, id, day, minutes, golden = false) {
   if (entry(state, id, day)) return false;
   state.logs.push({ id, day, minutes });
+  if (golden) (state.goldenSteps ??= []).push(state.logs.length);
   return true;
 }
 
 export function removeLog(state, id, day) {
   const original = state.logs.length;
-  state.logs = state.logs.filter((log) => log.id !== id || log.day !== day);
+  Object.assign(state, keepSessions(state, (log) => log.id !== id || log.day !== day));
   return original !== state.logs.length;
 }
 
@@ -51,9 +52,101 @@ export function deleteHabit(state, id) {
   return {
     ...state,
     habits,
-    logs: state.logs.filter((log) => log.id !== id),
+    ...keepSessions(state, (log) => log.id !== id),
     timer: state.timer?.id === id ? null : state.timer,
   };
+}
+
+function keepSessions(state, keep) {
+  // Step numbers follow save order. Reindex surviving golden sessions after a removal.
+  const golden = new Set(state.goldenSteps);
+  const logs = [];
+  const goldenSteps = [];
+  state.logs.forEach((log, index) => {
+    if (!keep(log)) return;
+    logs.push(log);
+    if (golden.has(index + 1)) goldenSteps.push(logs.length);
+  });
+  return state.goldenSteps ? { logs, goldenSteps } : { logs };
+}
+
+export const stepsPerZone = 8;
+export const zones = [
+  { name: 'Ground level', distance: '0 km' },
+  { name: 'Sky', distance: '10 km' },
+  { name: 'Atmosphere edge', distance: '100 km' },
+  { name: 'Low Earth orbit', distance: '400 km' },
+  { name: 'The Moon', distance: '384,000 km' },
+  { name: 'Solar system', distance: '150 million km' },
+  { name: 'Milky Way', distance: '100,000 light-years' },
+  { name: 'The universe', distance: '93 billion light-years' },
+  { name: '', distance: '' },
+];
+
+export function zoneIndex(sessions) {
+  return Math.min(zones.length - 1, Math.floor(Math.max(0, sessions) / stepsPerZone));
+}
+
+export function normalizeGoldenSteps(steps, total) {
+  if (!Array.isArray(steps)) return [];
+  return [...new Set(steps.filter((step) => Number.isInteger(step) && step > 0 && step <= total))].sort((a, b) => a - b);
+}
+
+const validDay = (day) => typeof day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(day) && dayKey(localDate(day)) === day;
+const validMinutes = (minutes) => Number.isInteger(minutes) && minutes >= 1 && minutes <= 180;
+const validId = (id) => typeof id === 'string' && /^[a-z0-9_-]{1,80}$/i.test(id);
+const invalidBackup = () => new Error('Choose a valid Step by Step JSON backup.');
+
+function readHabit(habit) {
+  if (!habit || !validId(habit.id) || typeof habit.name !== 'string' || !habit.name.trim() || habit.name.length > 48 ||
+      !validMinutes(habit.minutes) || !validMinutes(habit.cap) || ![0, 1, 2, 5, 10].includes(habit.step) ||
+      !validDay(habit.created) || !validDay(habit.targetSince ?? habit.created)) throw invalidBackup();
+  const { id, name, minutes, step, cap, created, targetSince = created } = habit;
+  const category = ['movement', 'read', 'calm', 'learn', 'write', 'other'].includes(habit.category) ? habit.category : 'other';
+  const result = { id, name, minutes, step, cap, created, targetSince, category };
+  if (habit.weekdays !== undefined) {
+    if (!Array.isArray(habit.weekdays) || !habit.weekdays.length || habit.weekdays.some((d) => !Number.isInteger(d) || d < 0 || d > 6)) throw invalidBackup();
+    result.weekdays = [...new Set(habit.weekdays)];
+  }
+  if (habit.archived !== undefined) {
+    if (!validDay(habit.archived)) throw invalidBackup();
+    result.archived = habit.archived;
+  }
+  if (habit.inactivePeriods !== undefined) {
+    if (!Array.isArray(habit.inactivePeriods)) throw invalidBackup();
+    result.inactivePeriods = habit.inactivePeriods.map((period) => {
+      if (!period || !validDay(period.from) || (period.to !== undefined && !validDay(period.to))) throw invalidBackup();
+      return period.to === undefined ? { from: period.from } : { from: period.from, to: period.to };
+    });
+  }
+  return result;
+}
+
+export function mergeBackup(state, backup) {
+  if (!Array.isArray(backup?.habits) || !Array.isArray(backup.logs)) throw invalidBackup();
+  const habits = new Map(state.habits.map((habit) => [habit.id, habit]));
+  const backupIds = new Set();
+  for (const source of backup.habits) {
+    const habit = readHabit(source);
+    if (backupIds.has(habit.id)) throw invalidBackup();
+    backupIds.add(habit.id);
+    if (!habits.has(habit.id)) habits.set(habit.id, habit);
+  }
+  const sessionKey = (log) => log.id + ':' + log.day;
+  const logs = [...state.logs];
+  const indices = new Map(logs.map((log, index) => [sessionKey(log), index + 1]));
+  const golden = new Set(normalizeGoldenSteps(state.goldenSteps, logs.length));
+  const importedGold = new Set(normalizeGoldenSteps(backup.goldenSteps, backup.logs.length));
+  backup.logs.forEach((log, index) => {
+    if (!log || !backupIds.has(log.id) || !validDay(log.day) || !validMinutes(log.minutes)) throw invalidBackup();
+    const key = sessionKey(log);
+    if (!indices.has(key)) {
+      logs.push({ id: log.id, day: log.day, minutes: log.minutes });
+      indices.set(key, logs.length);
+    }
+    if (importedGold.has(index + 1)) golden.add(indices.get(key));
+  });
+  return { ...state, habits: [...habits.values()], logs, goldenSteps: [...golden].sort((a, b) => a - b) };
 }
 
 export function nextTarget(state, habit) {
@@ -66,22 +159,11 @@ export function nextTarget(state, habit) {
 
 export const milestones = [1, 3, 7, 14, 25];
 
-export function coreCharge(logs, day, scheduledTotal) {
+export function dayCompletion(logs, day, scheduledTotal) {
   const done = logs.filter((log) => log.day === day).length;
   const total = Math.max(done, scheduledTotal);
   const ratio = total ? done / total : 0;
-  const crystals = total <= 12 ? done : Math.ceil(ratio * 12);
-  return { done, total, ratio, crystals };
-}
-
-export function coreEvolution(count) {
-  const finalMilestone = milestones.at(-1);
-  if (count >= finalMilestone) {
-    const tier = Math.floor(count / finalMilestone);
-    return { level: milestones.length - 1 + tier, previous: tier * finalMilestone, next: (tier + 1) * finalMilestone };
-  }
-  const level = milestones.filter((value) => count >= value).length;
-  return { level, previous: milestones[level - 1] ?? 0, next: milestones[level] };
+  return { done, total, ratio };
 }
 
 export function mastery(logs, id) {
