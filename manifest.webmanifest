@@ -1,0 +1,22 @@
+{
+  "name": "Step by Step — Habit Tracker",
+  "short_name": "Step by Step",
+  "description": "Little steps. Lasting change.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#130722",
+  "theme_color": "#190c33",
+  "icons": [
+    {
+      "src": "./assets/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": [
+    "lifestyle",
+    "productivity"
+  ]
+}
