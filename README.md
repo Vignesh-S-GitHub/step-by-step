@@ -1,24 +1,46 @@
 # Step by Step
 
-A visual, privacy-first habit tracker with an interactive progress crystal, focused sessions, adaptive themes and offline-first PWA support.
+A gentle, visual habit tracker with the approved Rising Steps purple icon, dynamic themed backgrounds, and an interactive 3D **Momentum Core** crystal.
+
+## Live site
+
+**https://vignesh-s-github.github.io/step-by-step/**
+
+The site is deployed automatically from the `dist/` directory through `.github/workflows/pages.yml` whenever `main` changes. Deployment status: [GitHub Actions](https://github.com/Vignesh-S-GitHub/step-by-step/actions).
 
 ## Features
 
-- Recurring daily and weekly habits with 5 or 10 minute focus sessions
-- Interactive 3D progress crystal, pulse interactions, optional growth nudges
-- Animated Amethyst, Lagoon, Dusk and Orbit backgrounds
-- Accessible, responsive icons and consistent controls
-- Local-only browser storage and JSON backup/restore
-- Seven-day progress and streak insights
+- Small daily or selected-weekday habits with timed 5/10-minute (or custom) sessions and check-offs
+- Optional goal increases after five sessions, with a configurable maximum
+- Touch/mouse-draggable, rotating 3D crystal; touch/click pulse, progress shards and milestones
+- Theme-wide **Amethyst**, **Lagoon**, **Dusk**, and **Orbit** palettes with animated atmospheres that respond to today's progress
+- Matching SVG controls, accessible dropdowns, themed seven-day multiselect, responsive mobile navigation
+- Session history and progress charts; archived and paused habits
+- Installable offline-ready PWA with the approved 1024px Rising Steps logo and optimized device icons
+- Local browser storage and JSON data export (no account or server required)
 
-## Run locally
+## Development
 
-Open `index.html` via a local web server (for example `python -m http.server 8080`), then navigate to `http://localhost:8080`.
+The deployable static app lives in **`dist/`**, with plain ES modules; no package install or build step is required.
 
-## Deployment
+```sh
+python -m http.server 8080 --directory dist
+```
 
-A GitHub Actions workflow in `.github/workflows/pages.yml` publishes the repository to GitHub Pages. In **Settings → Pages**, select **GitHub Actions** as the build and deployment source if not already selected.
+Then open [http://localhost:8080](http://localhost:8080). The browser requires a local HTTP server for the service worker and ES modules.
 
-Expected live URL: https://vignesh-s-github.github.io/step-by-step/
+Run regression tests with Node.js:
 
-All personal habit data is stored in the current browser; it is not synced to GitHub or a server.
+```sh
+node --test tests/*.test.mjs
+```
+
+## GitHub Pages setup
+
+The workflow deploys automatically **after** Pages is enabled for this repository. If your workflow says `Get Pages site failed`, navigate to **Settings → Pages → Build and deployment → Source: GitHub Actions**. A future `main` push will republish the app, or you can re-run the workflow from the Actions tab.
+
+The published artifact is `dist/`, not the repository root. Keep relative asset URLs so GitHub project pages work correctly.
+
+## Privacy and limitations
+
+Habits, timer state, and completions are stored on this device in the current browser. They do not sync between browsers or devices. Use Settings → Export to keep a backup. Installed PWA icons and offline behavior depend on browser support.
