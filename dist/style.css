@@ -75,7 +75,7 @@ h1,h2,p{margin:0}
 .rail{display:flex;flex-direction:column;position:sticky;top:0;height:100dvh;padding:34px 19px 24px;background:linear-gradient(180deg,var(--rail),color-mix(in srgb,var(--rail) 78%,var(--sky-b)));border-right:1px solid var(--line)}
 .brand{display:inline-flex;align-items:center;gap:11px;width:max-content;font-size:23px;font-weight:760;line-height:1.02;letter-spacing:-.03em}
 .rail .brand{margin:0 0 42px 9px}
-.brand img{display:block}
+.brand img{display:block;flex:none;aspect-ratio:1;object-fit:contain}
 .brand small{display:block;margin-top:5px;color:var(--muted);font-size:11px;font-weight:500;letter-spacing:0}
 .rail-nav{display:grid;gap:6px}
 .rail-nav a,.rail-note{display:flex;align-items:center;gap:11px;min-height:46px;padding:0 13px;border-radius:11px;color:var(--muted);font-weight:580;text-align:left}
@@ -191,7 +191,6 @@ h1{font-size:40px;line-height:1.08;font-weight:740;letter-spacing:-.035em}
 .collection-ranks .next-rank span{background:var(--accent-deep);color:var(--accent)}
 .collection-ranks small{font-size:10px;line-height:1.17}
 .collection-ranks b{font-size:10px;font-variant-numeric:tabular-nums}
-.brand img{border-radius:10px;object-fit:cover}
 .install-guide{display:grid;gap:10px;color:var(--muted);margin:6px 0 14px}
 .install-guide strong{color:var(--ink)}
 dialog{width:min(465px,calc(100% - 28px));max-height:calc(100dvh - 28px);padding:0;border:1px solid var(--core-border);border-radius:18px;background:var(--surface);color:var(--ink);overflow:auto}

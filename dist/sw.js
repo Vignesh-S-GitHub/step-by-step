@@ -1,10 +1,10 @@
 const PREFIX = 'little-step-shell-';
-const CACHE = PREFIX + 'v5';
+const CACHE = PREFIX + 'v6';
 const root = self.registration.scope;
 const shell = [
   './', './style.css', './app.mjs', './model.mjs', './core.mjs', './prism.mjs', './manifest.webmanifest',
-  './assets/step-64.png', './assets/step-180.png', './assets/step-192.png',
-  './assets/step-512.png', './assets/step-maskable.png', './assets/inter.woff2',
+  './assets/rising-steps.svg', './assets/rising-steps-180.png', './assets/rising-steps-192.png',
+  './assets/rising-steps-512.png', './assets/rising-steps-maskable.png', './assets/inter.woff2',
 ].map((path) => new URL(path, root).href);
 const files = new Set(shell.slice(1));
 
