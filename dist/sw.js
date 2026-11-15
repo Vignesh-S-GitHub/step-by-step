@@ -1,5 +1,5 @@
 const PREFIX = 'little-step-shell-';
-const CACHE = PREFIX + 'v8';
+const CACHE = PREFIX + 'v9';
 const root = self.registration.scope;
 const shell = [
   './', './style.css', './app.mjs', './model.mjs', './core.mjs', './prism.mjs', './manifest.webmanifest',

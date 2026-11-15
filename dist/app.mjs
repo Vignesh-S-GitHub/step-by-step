@@ -16,6 +16,7 @@ const icons = {
   write: '<path d="m14 6 4 4M4 20l4-1L20 7a2.8 2.8 0 0 0-4-4L4 15v5Z"/>',
   other: '<path d="m12 3 2.6 6.4L21 12l-6.4 2.6L12 21l-2.6-6.4L3 12l6.4-2.6L12 3Z"/>',
   arrow: '<path d="M4 12h15m-6-6 6 6-6 6"/>',
+  down: '<path d="m6 9 6 6 6-6"/>',
   chevron: '<path d="m9 6 6 6-6 6"/>',
   left: '<path d="m15 6-6 6 6 6"/>',
   trash: '<path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5"/>',
@@ -37,6 +38,11 @@ const coreRanks = ['Dormant', 'Spark', 'Prism', 'Radiant', 'Nova', 'Ascended'];
 
 const themeKey = 'little-step-theme';
 const themes = { amethyst: 'Amethyst', lagoon: 'Lagoon', dusk: 'Dusk', orbit: 'Orbit' };
+const pickers = {
+  category: { label: 'Category', options: Object.entries(categories) },
+  step: { label: 'Increase by', options: [0, 1, 2, 5, 10].map((step) => [String(step), step ? step + ' min' : 'Keep current']) },
+  theme: { label: 'Theme', options: Object.entries(themes) },
+};
 const orientation = { ...initialOrientation };
 let theme = 'amethyst';
 
@@ -68,6 +74,12 @@ function rankName(level) {
 const key = 'cairn-personal-habits-v1';
 const screen = document.querySelector('#screen');
 const sheet = document.querySelector('#sheet');
+const picker = document.createElement('dialog');
+picker.id = 'option-picker';
+picker.className = 'option-picker';
+picker.setAttribute('aria-labelledby', 'picker-title');
+sheet.after(picker);
+let pickerTrigger;
 const toast = document.querySelector('#toast');
 const coreObserver = new IntersectionObserver(([entry]) => {
   entry.target.classList.toggle('core-idle-paused', !entry.isIntersecting);
@@ -307,15 +319,84 @@ function openSheet(title, description, content, kind = '') {
   if (!open) sheet.showModal();
 }
 
+function pickerField(name, value) {
+  const { label, options } = pickers[name];
+  const current = options.find(([id]) => id === String(value)) || options[0];
+  return `<div class="picker-field ${name === 'theme' ? 'theme-picker' : ''}">
+    <span id="picker-label-${name}">${label}</span>
+    <input type="hidden" name="${name}" value="${current[0]}">
+    <button class="picker-trigger" type="button" data-action="open-picker" data-picker="${name}"
+      aria-haspopup="dialog" aria-controls="option-picker" aria-labelledby="picker-label-${name} picker-value-${name}">
+      <span id="picker-value-${name}">${current[1]}</span>${icon('down', 16)}
+    </button>
+  </div>`;
+}
+
+function setPickerValue(trigger, value) {
+  const name = trigger.dataset.picker;
+  const option = pickers[name].options.find(([id]) => id === value);
+  if (!option) return;
+  const input = trigger.previousElementSibling;
+  input.value = value;
+  trigger.querySelector('span').textContent = option[1];
+  if (picker.open && pickerTrigger === trigger) {
+    for (const button of picker.querySelectorAll('[data-option]')) {
+      button.setAttribute('aria-pressed', String(button.dataset.option === value));
+    }
+  }
+  return input;
+}
+
+function openPicker(trigger) {
+  const { label, options } = pickers[trigger.dataset.picker];
+  const selectedValue = trigger.previousElementSibling.value;
+  pickerTrigger = trigger;
+  picker.innerHTML = `<div class="sheet-body">
+    <div class="sheet-header"><h2 id="picker-title">${label}</h2><button class="icon-button" data-picker-close type="button" aria-label="Close options">${icon('close')}</button></div>
+    <ul class="picker-options">${options.map(([id, text]) => `<li>
+      <button type="button" data-option="${id}" aria-pressed="${id === selectedValue}">${text}${icon('check', 19)}</button>
+    </li>`).join('')}</ul>
+  </div>`;
+  picker.showModal();
+  picker.querySelector('[aria-pressed="true"]').focus();
+}
+
+picker.addEventListener('click', (event) => {
+  if (event.target === picker || event.target.closest('[data-picker-close]')) {
+    picker.close();
+    return;
+  }
+  const option = event.target.closest('[data-option]');
+  if (!option) return;
+  const input = setPickerValue(pickerTrigger, option.dataset.option);
+  picker.close();
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+});
+
+picker.addEventListener('keydown', (event) => {
+  const current = event.target.closest('[data-option]');
+  if (!current || !['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
+  const options = [...picker.querySelectorAll('[data-option]')];
+  const index = options.indexOf(current);
+  const next = event.key === 'Home' ? 0 : event.key === 'End' ? options.length - 1
+    : (index + (event.key === 'ArrowUp' ? -1 : 1) + options.length) % options.length;
+  event.preventDefault();
+  options[next].focus();
+});
+
+picker.addEventListener('close', () => {
+  if (pickerTrigger?.isConnected) pickerTrigger.focus({ preventScroll: true });
+});
+
 function habitForm(habit) {
   const value = habit || { name: '', category: 'other', minutes: 5, step: 5, cap: 20 };
   openSheet(habit ? 'Edit habit' : 'Add habit', 'Start with a daily target that feels easy to repeat.', `
     <form id="habit-form" data-id="${habit?.id || ''}">
       <label>Activity name<input name="name" maxlength="48" required value="${safe(value.name)}" placeholder="e.g. Stretch after work"></label>
-      <label>Category<select name="category">${Object.entries(categories).map(([id, name]) => `<option value="${id}" ${id === value.category ? 'selected' : ''}>${name}</option>`).join('')}</select></label>
+      ${pickerField('category', value.category)}
       <fieldset class="weekday-field"><legend>Repeat on</legend><div class="weekday-options">${repeatDays.map(([day,label]) => `<label class="weekday-option"><input type="checkbox" name="weekdays" value="${day}" ${(value.weekdays ?? [0,1,2,3,4,5,6]).includes(day) ? 'checked' : ''}><span>${label}</span></label>`).join('')}</div></fieldset>
       <div class="form-grid"><label>Daily minutes<input name="minutes" type="number" min="1" max="180" required inputmode="numeric" value="${value.minutes}"></label>
-      <label>Increase by<select name="step">${[0, 1, 2, 5, 10].map((step) => `<option value="${step}" ${step === value.step ? 'selected' : ''}>${step ? step + ' min' : 'Keep current'}</option>`).join('')}</select></label></div>
+      ${pickerField('step', value.step)}</div>
       <label data-cap ${value.step ? '' : 'hidden'}>Maximum minutes<input name="cap" type="number" min="1" max="180" ${value.step ? 'required' : 'disabled'} inputmode="numeric" value="${value.cap}"><small>After ${TARGET_SESSIONS} sessions at your target, Step by Step offers an increase.</small></label>
       <p class="form-error" role="alert" hidden></p>
       <button class="primary full-button" type="submit">${habit ? 'Save changes' : 'Add daily habit'}</button>
@@ -383,9 +464,7 @@ function complete(habit, fromTimer = false) {
 
 function settings() {
   openSheet('Settings', 'Your habits and session history are saved in this browser.', `
-    <label class="theme-picker">Theme
-      <select id="theme-select">${Object.entries(themes).map(([id, name]) => `<option value="${id}" ${theme === id ? 'selected' : ''}>${name}</option>`).join('')}</select>
-    </label>
+    ${pickerField('theme', theme)}
     <div class="settings-detail">${icon('today', 21)}<div><strong>Daily check-in</strong><p>Open Step by Step to see today’s activities and any available target increases.</p></div></div>
     ${standalone ? '' : '<button class="primary full-button" data-action="install">Install Step by Step</button>'}
     <button class="subtle full-button" data-action="export">Download activity data</button>`);
@@ -470,7 +549,7 @@ document.addEventListener('submit', (event) => {
 });
 
 document.addEventListener('change', (event) => {
-  if (event.target.id === 'theme-select') {
+  if (event.target.name === 'theme') {
     applyTheme(event.target.value, true);
     return;
   }
@@ -505,6 +584,7 @@ document.addEventListener('click', (event) => {
       break;
     case 'add': habitForm(); break;
     case 'edit': habitForm(habit); break;
+    case 'open-picker': openPicker(trigger); break;
     case 'close': sheet.close(); break;
     case 'timer': timerSheet(habit); break;
     case 'open-current': {
@@ -664,8 +744,8 @@ window.addEventListener('hashchange', () => {
 window.addEventListener('storage', (event) => {
   if (event.key === themeKey) {
     applyTheme(event.newValue);
-    const selector = document.querySelector('#theme-select');
-    if (selector) selector.value = theme;
+    const trigger = sheet.querySelector('[data-picker="theme"]');
+    if (trigger) setPickerValue(trigger, theme);
     return;
   }
   if (event.key !== key) return;

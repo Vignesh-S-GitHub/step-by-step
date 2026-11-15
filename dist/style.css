@@ -82,8 +82,8 @@ color:var(--ink);font:14px/1.45 Inter,system-ui,sans-serif;-webkit-tap-highlight
 @media(prefers-reduced-motion:reduce){.theme-atmosphere::before,.theme-atmosphere::after{animation:none}}
 .layout{position:relative}
 ::selection{background:var(--accent);color:var(--on-accent)}
-button,input,select{font:inherit}
-button,a,input,select,summary{outline-offset:4px}
+button,input{font:inherit}
+button,a,input,summary{outline-offset:4px}
 :focus-visible{outline:2px solid var(--accent)}
 button{cursor:pointer;border:0;background:none;color:inherit}
 button:disabled{cursor:default;opacity:.45}
@@ -223,7 +223,7 @@ dialog::backdrop{background:color-mix(in srgb,var(--bg) 74%,transparent)}
 form{display:grid;gap:10px}
 label{display:grid;gap:4px;color:var(--ink);font-size:12px;font-weight:650}
 label small{color:var(--muted);font-size:11px;font-weight:500}
-input,select{width:100%;min-height:42px;border:1px solid var(--control-edge);border-radius:9px;background:var(--field);color:var(--ink);padding:7px 10px;caret-color:var(--accent)}
+input,.picker-trigger{width:100%;min-height:42px;border:1px solid var(--control-edge);border-radius:9px;background:var(--field);color:var(--ink);padding:7px 10px;caret-color:var(--accent)}
 input::placeholder{color:var(--muted)}
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
 .full-button{width:100%;min-height:44px}
@@ -235,12 +235,17 @@ input::placeholder{color:var(--muted)}
 .clock output{font-size:56px;font-weight:720;letter-spacing:-.035em;font-variant-numeric:tabular-nums;color:var(--accent)}
 .clock span{color:var(--muted)}
 .theme-picker{margin:4px 0 12px}
-.theme-picker select{min-height:44px}
-/* One visual language for dropdowns, weekday multi-select, and theme controls. */
-label:has(>select){position:relative}
-label:has(>select)::after{content:"";width:7px;height:7px;position:absolute;right:16px;bottom:17px;border-right:1.8px solid var(--accent);border-bottom:1.8px solid var(--accent);transform:rotate(45deg);pointer-events:none}
-select{appearance:none;padding-right:35px;background:var(--field)}
-select option{background:var(--surface);color:var(--ink)}
+.picker-field{display:grid;align-content:start;gap:4px;min-width:0;color:var(--ink);font-size:12px;font-weight:650}
+.picker-trigger{display:flex;align-items:center;justify-content:space-between;gap:4px;min-height:44px;text-align:left}
+.picker-trigger svg{color:var(--accent)}
+.option-picker{width:min(360px,calc(100% - 28px));box-shadow:0 14px 44px color-mix(in srgb,var(--bg) 75%,transparent)}
+.option-picker::backdrop{background:color-mix(in srgb,var(--bg) 52%,transparent)}
+.picker-options{display:grid;gap:5px;margin:0;padding:0;list-style:none}
+.picker-options button{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:46px;padding:8px 12px;border:1px solid var(--line);border-radius:9px;background:var(--field);color:var(--ink);font-weight:630;text-align:left;outline-offset:-3px}
+.picker-options button svg{visibility:hidden}
+.picker-options button[aria-pressed="true"]{border-color:var(--accent);background:var(--action);color:var(--on-accent);outline-color:var(--on-accent)}
+.picker-options button[aria-pressed="true"] svg{visibility:visible}
+@media(hover:hover){.picker-options button[aria-pressed="false"]:hover,.picker-trigger:hover{background:var(--raised)}}
 .weekday-field{padding:0;margin:3px 0 5px;min-width:0;border:0}
 .weekday-field legend{font-size:12px;font-weight:650;color:var(--ink);margin-bottom:9px}
 .weekday-options{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
@@ -324,6 +329,7 @@ select option{background:var(--surface);color:var(--ink)}
   .totals strong{font-size:19px}
   .collection-ranks li{grid-template-rows:24px minmax(2.4em,auto) auto}.collection-ranks li span{height:23px}
   dialog{margin:auto auto 0;max-height:calc(100dvh - env(safe-area-inset-top) - 8px);width:min(100%,500px);border-radius:18px 18px 0 0}
+  .option-picker{width:min(100%,500px)}
   .sheet-body{padding-bottom:calc(14px + env(safe-area-inset-bottom))}
   .toast{bottom:calc(var(--dock) + env(safe-area-inset-bottom) + 7px)}
 }
