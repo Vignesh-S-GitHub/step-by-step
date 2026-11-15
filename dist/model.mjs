@@ -23,7 +23,8 @@ export function weekDays(day) {
 export function scheduled(habits, day) {
   return habits.filter((habit) =>
     day >= habit.created && (!habit.archived || day < habit.archived) &&
-    !habit.inactivePeriods?.some(({ from, to }) => day >= from && (!to || day < to))
+    !habit.inactivePeriods?.some(({ from, to }) => day >= from && (!to || day < to)) &&
+    (!Array.isArray(habit.weekdays) || habit.weekdays.includes(localDate(day).getDay()))
   );
 }
 
