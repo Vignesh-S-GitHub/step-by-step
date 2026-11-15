@@ -481,8 +481,8 @@ function createView(T, stage) {
     regular.emissive.copy(themeSky);
     trim.color.copy(themeHighlight);
     trim.emissive.copy(themeHighlight).multiplyScalar(.55);
-    body.color.copy(themeEdge);
-    body.emissive.copy(themeHighlight);
+    body.material.color.copy(themeEdge);
+    body.material.emissive.copy(themeHighlight);
     actorGlow.material.color.copy(themeHighlight);
     pulseMaterial.color.copy(themeEdge);
     for (const light of trail) light.material.color.copy(themeHighlight);
