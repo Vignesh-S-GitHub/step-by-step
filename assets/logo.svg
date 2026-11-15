@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Step by Step rising steps logo">
+<defs>
+ <radialGradient id="bg" cx="60%" cy="38%" r="85%"><stop offset="0" stop-color="#6b0eaa"/><stop offset=".49" stop-color="#3a0777"/><stop offset="1" stop-color="#140342"/></radialGradient>
+ <linearGradient id="first" x1=".13" y1="0" x2=".73" y2="1" objectBoundingBox="true"><stop stop-color="#f1cdff"/><stop offset=".52" stop-color="#be85ff"/><stop offset="1" stop-color="#8f4eed"/></linearGradient>
+ <linearGradient id="middle" x1=".12" y1="0" x2=".85" y2="1"><stop stop-color="#f6adff"/><stop offset=".58" stop-color="#a242ee"/><stop offset="1" stop-color="#8025d7"/></linearGradient>
+ <linearGradient id="high" x1="0" y1="0" x2=".7" y2="1"><stop stop-color="#ffb7fa"/><stop offset=".2" stop-color="#e853fe"/><stop offset=".55" stop-color="#af07f7"/><stop offset="1" stop-color="#8701e5"/></linearGradient>
+ <linearGradient id="wave" x1="0" y1="0" x2=".7" y2="1"><stop stop-color="#6610b8"/><stop offset=".55" stop-color="#3c067d"/><stop offset="1" stop-color="#2c055f"/></linearGradient>
+ <radialGradient id="orb"><stop offset="0" stop-color="#fff9f6"/><stop offset="1" stop-color="#fbd9f4"/></radialGradient>
+ <filter id="ambient" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="48"/></filter>
+ <filter id="pink-glow" x="-160%" y="-160%" width="420%" height="420%"><feGaussianBlur stdDeviation="28"/></filter>
+ <clipPath id="rounded"><rect x="2" y="2" width="1020" height="1020" rx="245"/></clipPath>
+</defs>
+<g clip-path="url(#rounded)">
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <ellipse cx="701" cy="364" rx="265" ry="300" fill="#ad0bf7" opacity=".2" filter="url(#ambient)"/>
+  <path d="M173 893V638c0-24 31-43 64-43h153c38 0 70 22 70 53v245z" fill="url(#first)"/>
+  <path d="M367 875V525c0-29 32-49 69-49h154c36 0 64 25 64 57v342z" fill="url(#middle)"/>
+  <path d="M564 803V423c0-30 35-56 74-56h137c41 0 75 28 75 66v370z" fill="url(#high)"/>
+  <circle cx="716" cy="299" r="72" fill="#e300ff" opacity=".75" filter="url(#pink-glow)"/>
+  <circle cx="716" cy="299" r="48" fill="url(#orb)"/>
+  <path d="M-50 921C220 859 475 772 665 724c171-42 287-43 411 19v338H-50z" fill="url(#wave)"/>
+  <path d="M-40 928C180 872 476 775 653 730c164-43 298-44 413 10" fill="none" stroke="#a033ea" stroke-width="3" opacity=".25"/>
+</g>
+<rect x="2" y="2" width="1020" height="1020" rx="245" fill="none" stroke="#691cb3" stroke-width="3"/>
+</svg>
