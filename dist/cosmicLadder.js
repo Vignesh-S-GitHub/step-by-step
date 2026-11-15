@@ -16,6 +16,7 @@ const fract = (n) => n - Math.floor(n);
 const hash = (x, y) => fract(Math.sin(x * 127.1 + y * 311.7) * 43758.5453123);
 const mix = (a, b, t) => a + (b - a) * t;
 let threePromise;
+let webGLUnavailable = false;
 
 function noise(x, y) {
   const i = Math.floor(x), j = Math.floor(y), u = smooth(x - i), v = smooth(y - j);
@@ -126,9 +127,16 @@ export function mount(container) {
   }
   updateLabels();
   threePromise ??= import(threeUrl).catch((error) => { threePromise = undefined; throw error; });
-  threePromise.then((THREE) => {
+  function startView(THREE) {
     if (closed) return;
-    view = createView(THREE, stage);
+    try {
+      if (THREE && !webGLUnavailable) view = createView(THREE, stage);
+    } catch {
+      webGLUnavailable = true;
+    }
+    if (!view) {
+      view = createCanvasFallback(stage);
+    }
     const count = sceneCount();
     const visibleGold = debug === null ? golden : pending?.golden ? [count] : [];
     view.sync(pending?.previous ?? count, visibleGold, false);
@@ -136,8 +144,9 @@ export function mount(container) {
     pending = undefined;
     stage.classList.add('ladder-live');
     stage.removeAttribute('aria-disabled');
-  }).catch(() => {
-    // The card and progress readout remain available offline or without WebGL.
+  }
+  threePromise.then(startView, () => startView(null)).catch(() => {
+    // The static card is the last fallback when a browser supplies no canvas context.
   });
 
   return {
@@ -764,6 +773,295 @@ function createView(T, stage) {
       renderer.dispose();
       renderer.forceContextLoss();
       renderer.domElement.remove();
+      stage.classList.remove('ladder-live');
+    },
+  };
+}
+
+// A lightweight projected scene for browsers without WebGL. It uses the same
+// progress, artwork maps, themes and interaction targets as the main renderer.
+function createCanvasFallback(stage) {
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Canvas is unavailable');
+  stage.append(canvas);
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+  const events = new AbortController();
+  const options = { signal: events.signal };
+  const dust = Array.from({ length: 115 }, (_, i) => [hash(i, 621), hash(i, 622), hash(i, 623), hash(i, 624)]);
+  let width = 0, height = 0, frame = 0, last = 0, time = 0, visible = true;
+  let count = 0, gold = new Set(), change, pulse, angle = .48, drag;
+  let climberX = 0, climberY = 0;
+
+  function halo(x, y, radius, color, opacity) {
+    const glow = ctx.createRadialGradient(x, y, 0, x, y, radius);
+    glow.addColorStop(0, color);
+    glow.addColorStop(1, color + '00');
+    ctx.globalAlpha *= opacity;
+    ctx.fillStyle = glow;
+    ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+    ctx.globalAlpha /= opacity;
+  }
+
+  function planet(name, x, y, radius, rim, orbit = false) {
+    halo(x, y, radius * 1.22, rim, .39);
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.clip();
+    const map = textureCanvas(name);
+    const drift = (time * 2 + radius * .43) % (radius * 2);
+    ctx.drawImage(map, x - radius - drift, y - radius, radius * 2, radius * 2);
+    ctx.drawImage(map, x + radius - drift, y - radius, radius * 2, radius * 2);
+    if (name === 'earth') {
+      ctx.globalAlpha *= .63;
+      ctx.drawImage(textureCanvas('clouds'), x - radius, y - radius, radius * 2, radius * 2);
+      ctx.globalAlpha /= .63;
+    }
+    const shade = ctx.createRadialGradient(x - radius * .46, y - radius * .55, radius * .16, x, y, radius * 1.17);
+    shade.addColorStop(0, '#00000000');
+    shade.addColorStop(1, '#040719e0');
+    ctx.fillStyle = shade;
+    ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+    ctx.restore();
+    if (orbit) {
+      ctx.strokeStyle = '#d5a687a8';
+      for (let i = 0; i < 3; i++) {
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.ellipse(x, y, radius * (1.35 + i * .19), radius * (.28 + i * .057), -.21, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+  }
+
+  function mist(name, color, x, y, w, h, opacity) {
+    // Tint the cached noise map with a gradient fill beneath its wisps.
+    halo(x + w / 2, y + h / 2, w * .45, color, opacity * .38);
+    ctx.save();
+    ctx.globalAlpha *= opacity;
+    ctx.drawImage(textureCanvas(name), x, y, w, h);
+    ctx.restore();
+  }
+
+  function drawScenery(zone, center, unit) {
+    const y = height, parallax = Math.sin(angle) * unit * .12;
+    const x = center - parallax;
+    if (zone === 0) {
+      halo(x - unit * .56, y * .55, unit * .78, '#ffa36b', .43);
+      planet('sun', x - unit * .56, y * .57, unit * .21, '#fca263');
+      const colors = ['#49394e', '#375b60', '#315048'];
+      for (let j = 0; j < colors.length; j++) {
+        ctx.fillStyle = colors[j];
+        ctx.beginPath();
+        ctx.moveTo(x - unit * 1.78, y);
+        ctx.bezierCurveTo(x - unit * 1.06, y * (.49 + j * .08), x - unit * .81, y * (.66 + j * .06), x - unit * .35, y * .84);
+        ctx.bezierCurveTo(x + unit * .66, y * (.45 + j * .10), x + unit * 1.06, y * .93, x + unit * 1.48, y);
+        ctx.closePath();
+        ctx.fill();
+      }
+      for (let i = 0; i < 7; i++) {
+        const tx = x + (hash(i, 13) - .5) * unit * 2.13;
+        const ty = y * (.87 + hash(i, 21) * .11);
+        const size = unit * (.10 + hash(i, 23) * .06);
+        ctx.fillStyle = '#25483f';
+        ctx.beginPath();
+        ctx.moveTo(tx, ty - size * 1.7);
+        ctx.lineTo(tx + size * .52, ty);
+        ctx.lineTo(tx - size * .52, ty);
+        ctx.fill();
+      }
+    } else if (zone === 1) {
+      for (let i = 0; i < 6; i++) mist('nebula', '#b7c6ff', x + (hash(i, 61) - .68) * width, y * hash(i, 62), unit * 1.3, unit * .45, .39);
+    } else if (zone === 2) planet('earth', x, y * 2.25, unit * 1.96, '#4e89ff');
+    else if (zone === 3) {
+      planet('earth', x - unit * .38, y * 1.1, unit * .68, '#4e89ff');
+      const sat = x + Math.sin(time * .36) * unit * .8;
+      ctx.fillStyle = '#5a8acc';
+      ctx.fillRect(sat - unit * .18, y * .35, unit * .36, unit * .05);
+      ctx.fillStyle = '#c1bbdb';
+      ctx.fillRect(sat - unit * .041, y * .32, unit * .082, unit * .11);
+    } else if (zone === 4) {
+      planet('moon', x + unit * .38, y * .96, unit * .63, '#aeb2dc');
+      planet('earth', x - unit * .56, y * .25, unit * .14, '#5b8ce9');
+    } else if (zone === 5) {
+      planet('sun', x - unit * .89, y * .47, unit * .30, '#ff9b56');
+      planet('gas', x + unit * .5, y * .26, unit * .19, '#d19893');
+      planet('gas', x + unit * .60, y * .79, unit * .25, '#c79286', true);
+    } else {
+      for (let i = 0; i < (zone === 7 ? 9 : 3); i++) {
+        const galaxyWidth = unit * (zone === 7 ? .32 + hash(i, 52) * .6 : 1.71);
+        mist(i % 3 === 0 && zone !== 7 ? 'nebula' : 'spiral', zone === 8 && i % 2 ? '#ffab6f' : '#8c64ff',
+          x + (hash(i, 53) - .78) * width * .8, y * (.06 + hash(i, 51) * .74),
+          galaxyWidth, galaxyWidth * .46, .34);
+      }
+    }
+  }
+
+  function draw() {
+    if (!width || !height) return;
+    const palette = palettes[document.documentElement.dataset.theme] ?? palettes.amethyst;
+    ctx.clearRect(0, 0, width, height);
+    const zone = zoneIndex(count);
+    const center = width * (width < 560 ? .72 : .68);
+    const unit = Math.min(height, width * .47);
+    const age = change ? time - change.at : 2;
+    const warp = change?.warp ? 1 - smooth(age / .68) : 0;
+    stage.style.setProperty('--ladder-top', palette[0]);
+    stage.style.setProperty('--ladder-horizon', scenicSkies[zone]);
+    for (const [x, y, light, phase] of dust) {
+      const drift = phase * 2.5 * Math.sin(angle);
+      const twinkle = reduced.matches ? 1 : .78 + .22 * Math.sin(time * 1.9 + phase * 6.28);
+      const sx = fract(x + drift * .008) * width;
+      const sy = fract(y + phase * .019 * Math.sin(time * .3)) * height;
+      ctx.fillStyle = light > .93 ? '#f3c4d7' : palette[3];
+      ctx.globalAlpha = (.16 + light * .56) * twinkle;
+      ctx.fillRect(sx, sy, light > .88 ? 1.65 : 1, (light > .88 ? 1.65 : 1) + warp * phase * 25);
+    }
+    ctx.globalAlpha = 1 - warp * .80;
+    drawScenery(zone, center, unit);
+    ctx.globalAlpha = 1;
+
+    const path = (step) => {
+      const phase = angle + step * .66;
+      return [center + Math.sin(phase) * unit * .28, height * .44 + (count - step) * unit * .093 + Math.cos(phase) * unit * .075];
+    };
+    const stepWidth = unit * .29, stepHeight = unit * .048;
+    for (let step = Math.max(0, count - 10); step <= count; step++) {
+      const [x, baseY] = path(step);
+      const y = step === count && age < .7 ? baseY - Math.exp(-age * 6) * Math.cos(age * 19) * unit * .13 : baseY;
+      const gradient = ctx.createLinearGradient(x, y - stepHeight, x, y + stepHeight);
+      gradient.addColorStop(0, gold.has(step) ? '#ffde8b' : palette[3]);
+      gradient.addColorStop(.35, gold.has(step) ? '#d58237' : palette[2]);
+      gradient.addColorStop(1, gold.has(step) ? '#76432d' : palette[1]);
+      ctx.fillStyle = gradient;
+      ctx.strokeStyle = gold.has(step) ? '#ffc16f' : palette[3];
+      ctx.lineWidth = .65;
+      ctx.beginPath();
+      const pitch = Math.cos(angle + step * .66) * stepWidth * .15;
+      ctx.moveTo(x - stepWidth / 2, y + pitch);
+      ctx.lineTo(x + stepWidth / 2, y - pitch);
+      ctx.lineTo(x + stepWidth / 2 - 4, y - pitch + stepHeight);
+      ctx.lineTo(x - stepWidth / 2 + 4, y + pitch + stepHeight);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+
+    const [fromX, fromY] = path(Math.max(0, count - 1));
+    const [toX, toY] = path(count);
+    const hop = smooth(age / .62);
+    climberX = mix(fromX, toX, hop);
+    climberY = mix(fromY, toY, hop) - unit * (.075 + .16 * Math.sin(hop * Math.PI) + .012 * Math.sin(time * 2.35));
+    halo(climberX, climberY, unit * .105, palette[2], .67);
+    ctx.fillStyle = gold.has(count) ? '#ffd899' : palette[3];
+    ctx.beginPath();
+    ctx.arc(climberX, climberY, unit * .021, 0, Math.PI * 2);
+    ctx.fill();
+    const ring = Math.min(age, pulse === undefined ? 2 : time - pulse);
+    if (ring < .8) {
+      ctx.globalAlpha = (1 - ring / .8) * .68;
+      ctx.strokeStyle = palette[3];
+      ctx.beginPath();
+      ctx.ellipse(toX, toY, unit * (.035 + ring * .24), unit * (.012 + ring * .063), 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    if (change && age < .85) {
+      ctx.globalAlpha = (1 - age / .85) * .7;
+      ctx.fillStyle = change.golden ? '#ffd082' : palette[3];
+      if (change.golden) ctx.fillRect(toX - 1, 0, 2, toY);
+      for (let i = 0; i < 17; i++) {
+        const spread = age * (15 + hash(i, 100) * unit * .85);
+        const direction = hash(i, 101) * 6.28;
+        ctx.fillRect(toX + Math.cos(direction) * spread, toY + Math.sin(direction) * spread * .66, change.golden ? 2.5 : 1.5, 1.5);
+      }
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  function start() {
+    if (!document.hidden && visible && !frame) frame = requestAnimationFrame(tick);
+  }
+  function stop() {
+    cancelAnimationFrame(frame);
+    frame = 0; last = 0;
+  }
+  function tick(now) {
+    frame = 0;
+    if (!last || now - last >= 30 || reduced.matches) {
+      const delta = last ? Math.min((now - last) / 1000, .07) : 0;
+      last = now;
+      if (!reduced.matches) {
+        time += delta;
+        if (!drag) angle += delta * .09;
+      }
+      draw();
+    }
+    if (!reduced.matches) start();
+  }
+  const resize = new ResizeObserver(([entry]) => {
+    width = entry.contentRect.width;
+    height = entry.contentRect.height;
+    if (!width || !height) return;
+    const ratio = Math.min(devicePixelRatio, 1.5);
+    canvas.width = Math.round(width * ratio);
+    canvas.height = Math.round(height * ratio);
+    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+    start();
+  });
+  const observer = new IntersectionObserver(([entry]) => {
+    visible = entry.isIntersecting;
+    if (visible) start(); else stop();
+  });
+  const appearance = new MutationObserver(start);
+  resize.observe(stage);
+  observer.observe(stage);
+  appearance.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  document.addEventListener('visibilitychange', () => document.hidden ? stop() : start(), options);
+  reduced.addEventListener('change', () => { if (reduced.matches) { change = undefined; pulse = undefined; } start(); }, options);
+  stage.addEventListener('pointerdown', (event) => {
+    if (event.button || drag) return;
+    drag = { id: event.pointerId, x: event.clientX, moved: false };
+    stage.setPointerCapture(event.pointerId);
+  }, options);
+  stage.addEventListener('pointermove', (event) => {
+    if (event.pointerId !== drag?.id || Math.abs(event.clientX - drag.x) < 3) return;
+    drag.moved = true;
+    angle += (event.clientX - drag.x) * .016;
+    drag.x = event.clientX;
+    start();
+  }, options);
+  function finish(event) {
+    if (event.pointerId !== drag?.id) return;
+    const rect = stage.getBoundingClientRect();
+    if (event.type === 'pointerup' && !drag.moved && !reduced.matches &&
+        Math.hypot(event.clientX - rect.left - climberX, event.clientY - rect.top - climberY) < 40) pulse = time;
+    drag = undefined;
+    start();
+  }
+  for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) stage.addEventListener(type, finish, options);
+  stage.addEventListener('click', (event) => { if (!event.detail && !reduced.matches) { pulse = time; start(); } }, options);
+  stage.addEventListener('keydown', (event) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home'].includes(event.key)) return;
+    angle = event.key === 'Home' ? .48 : angle + (event.key === 'ArrowLeft' ? -.26 : .26);
+    event.preventDefault();
+    start();
+  }, options);
+  return {
+    sync(next, golden, animate, warp) {
+      count = next;
+      gold = new Set(golden);
+      change = animate && !reduced.matches ? { at: time, golden: gold.has(count), warp } : undefined;
+      start();
+    },
+    destroy() {
+      stop();
+      events.abort();
+      resize.disconnect();
+      observer.disconnect();
+      appearance.disconnect();
+      canvas.remove();
       stage.classList.remove('ladder-live');
     },
   };

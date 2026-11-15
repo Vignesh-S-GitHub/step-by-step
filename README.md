@@ -45,4 +45,4 @@ The published artifact is `dist/`, not the repository root. Keep relative asset 
 
 ## Privacy and limitations
 
-Habits, timer state, and completions are stored on this device in the current browser. They do not sync between browsers or devices. Use Settings → Download activity data to keep a backup. Import activity data merges a backup into the current data and skips duplicate habit/day sessions. The ladder can use its cached Three.js renderer offline and displays a lightweight fallback if WebGL or the renderer is unavailable.
+Habits, timer state, and completions are stored on this device in the current browser. They do not sync between browsers or devices. Use Settings → Download activity data to keep a backup. Import activity data merges a backup into the current data and skips duplicate habit/day sessions. The ladder can use its cached Three.js renderer offline and uses an interactive Canvas 2D fallback if WebGL or the renderer is unavailable.
