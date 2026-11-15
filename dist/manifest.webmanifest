@@ -1,0 +1,31 @@
+{
+  "id": "./",
+  "name": "Step by Step",
+  "short_name": "Step by Step",
+  "description": "A daily habit tracker with short sessions and an animated Momentum Core.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#11121a",
+  "theme_color": "#11121a",
+  "icons": [
+    {
+      "src": "assets/step-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/step-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/step-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

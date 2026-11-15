@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#11121a">
+  <meta name="description" content="Track short daily habits and charge your Momentum Core one session at a time.">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Step by Step · Daily habits</title>
+  <link rel="icon" href="assets/step-64.png" type="image/png">
+  <link rel="apple-touch-icon" href="assets/step-180.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="app.mjs"></script>
+</head>
+<body data-app="little-step">
+  <div class="theme-atmosphere" aria-hidden="true"></div>
+  <div class="layout">
+    <aside class="rail" aria-label="App navigation">
+      <a href="#today" class="brand" data-route="today"><img src="assets/step-64.png" alt="" width="44" height="44"><span>Step by Step<small>Daily habits</small></span></a>
+      <div class="rail-nav" data-navigation></div>
+      <button class="rail-note" data-action="settings"><span data-icon="lock"></span><span>Saved on this browser</span></button>
+    </aside>
+    <main class="workspace" id="workspace">
+      <div class="mobile-brand"><a href="#today" class="brand" data-route="today"><img src="assets/step-64.png" alt="" width="36" height="36"><span>Step by Step</span></a><button class="icon-button" data-action="settings" aria-label="Settings" data-icon="settings"></button></div>
+      <header class="page-header">
+        <div><h1 id="screen-title">Today</h1><p id="screen-subtitle"></p></div>
+        <button class="primary top-add" data-action="add"><span data-icon="plus"></span><span>Add habit</span></button>
+      </header>
+      <div id="screen" class="screen"></div>
+    </main>
+    <nav class="dock" aria-label="Main navigation" data-navigation></nav>
+  </div>
+  <dialog id="sheet" aria-labelledby="sheet-title"></dialog>
+  <div class="toast" id="toast" role="status"></div>
+  <noscript>Enable JavaScript to use Step by Step.</noscript>
+</body>
+</html>
