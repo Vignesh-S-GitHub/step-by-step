@@ -1,6 +1,6 @@
 import { bindPrism, initialOrientation } from './prism.mjs';
 import { coreArtwork, animateCore } from './core.mjs';
-import { TARGET_SESSIONS, dayKey, shiftDay, weekDays, scheduled, entry, logSession, removeLog, nextTarget, coreCharge, coreEvolution, mastery, milestones, remaining } from './model.mjs';
+import { TARGET_SESSIONS, dayKey, shiftDay, weekDays, scheduled, entry, logSession, removeLog, deleteHabit, nextTarget, coreCharge, coreEvolution, mastery, milestones, remaining } from './model.mjs';
 
 const icons = {
   today: '<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M16 3v4M8 3v4M3 10h18"/><path d="m9 15 2 2 4-4"/>',
@@ -18,6 +18,7 @@ const icons = {
   arrow: '<path d="M4 12h15m-6-6 6 6-6 6"/>',
   chevron: '<path d="m9 6 6 6-6 6"/>',
   left: '<path d="m15 6-6 6 6 6"/>',
+  trash: '<path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5"/>',
   close: '<path d="m6 6 12 12M18 6 6 18"/>',
   play: '<path d="m8 5 12 7-12 7Z"/>',
   pause: '<path d="M9 5v14m6-14v14"/>',
@@ -113,13 +114,15 @@ function starter(id, name, category, minutes) {
 let state = load();
 let route = readRoute();
 
-function save() {
+function save(candidate = state) {
   try {
-    localStorage.setItem(key, JSON.stringify(state));
+    localStorage.setItem(key, JSON.stringify(candidate));
     storageAvailable = true;
+    return true;
   } catch {
     storageAvailable = false;
     say('Browser storage is unavailable. Changes may be lost on reload.');
+    return false;
   }
 }
 
@@ -248,7 +251,7 @@ function habitsScreen() {
   const archived = state.habits.filter((habit) => habit.archived);
   return `<section class="habit-section manage-section" aria-labelledby="manage-title"><div class="section-title"><h2 id="manage-title">Your habits</h2><span class="completion">${countLabel(habits.length, 'habit')}</span></div>
     ${habits.length ? `<ul class="habit-list">${habits.map((habit) => row(habit, true)).join('')}</ul>` : '<div class="empty"><p>Start with one activity you can do in five minutes.</p><button class="small-action" data-action="add">Add a habit</button></div>'}
-    ${archived.length ? `<details class="archived"><summary>Archived habits (${archived.length})</summary><ul class="habit-list">${archived.map((habit) => `<li class="habit-row"><div class="habit-copy"><strong>${safe(habit.name)}</strong></div><button class="small-action" data-action="restore" data-id="${habit.id}">Restore</button></li>`).join('')}</ul></details>` : ''}
+    ${archived.length ? `<details class="archived"><summary>Archived habits (${archived.length})</summary><ul class="habit-list">${archived.map((habit) => `<li class="habit-row"><div class="habit-copy"><strong>${safe(habit.name)}</strong></div><button class="small-action" data-action="restore" data-id="${habit.id}">Restore</button><button class="icon-button danger" data-action="delete-habit" data-id="${habit.id}" aria-label="Delete ${safe(habit.name)}">${icon('trash', 19)}</button></li>`).join('')}</ul></details>` : ''}
   </section>`;
 }
 
@@ -316,7 +319,10 @@ function habitForm(habit) {
       <label data-cap ${value.step ? '' : 'hidden'}>Maximum minutes<input name="cap" type="number" min="1" max="180" ${value.step ? 'required' : 'disabled'} inputmode="numeric" value="${value.cap}"><small>After ${TARGET_SESSIONS} sessions at your target, Step by Step offers an increase.</small></label>
       <p class="form-error" role="alert" hidden></p>
       <button class="primary full-button" type="submit">${habit ? 'Save changes' : 'Add daily habit'}</button>
-      ${habit ? `<button class="subtle full-button" type="button" data-action="archive" data-id="${habit.id}">Archive habit</button>` : ''}
+      ${habit ? `<div class="form-grid">
+        <button class="subtle full-button" type="button" data-action="archive" data-id="${habit.id}">Archive habit</button>
+        <button class="subtle full-button danger" type="button" data-action="delete-habit" data-id="${habit.id}">${icon('trash', 17)} Delete habit</button>
+      </div>` : ''}
     </form>`, 'form');
 }
 
@@ -587,6 +593,43 @@ document.addEventListener('click', (event) => {
       render();
       say('Habit archived.');
       break;
+    case 'delete-habit': {
+      if (!habit) return;
+      const count = state.logs.filter((log) => log.id === id).length;
+      const history = count ? ` and ${countLabel(count, 'completed session')}` : '';
+      const cancel = habit.archived ? 'close' : 'edit';
+      openSheet('Delete this habit?', `${safe(habit.name)}${history} will be permanently deleted.`, `
+        <div class="form-grid">
+          <button class="subtle full-button" data-action="${cancel}" data-id="${id}" autofocus>Cancel</button>
+          <button class="primary full-button danger-primary" data-action="confirm-delete-habit" data-id="${id}">${icon('trash', 17)} Delete habit</button>
+        </div>`);
+      sheet.querySelector('[autofocus]').focus({ preventScroll: true });
+      break;
+    }
+    case 'confirm-delete-habit': {
+      const next = deleteHabit(state, id);
+      if (next === state) {
+        sheet.close();
+        return;
+      }
+      if (!save(next)) {
+        const description = sheet.querySelector('.sheet-header p');
+        description.setAttribute('role', 'alert');
+        description.textContent = 'Browser storage is unavailable. The habit was kept.';
+        return;
+      }
+      state = next;
+      if (undoLog?.id === id) undoLog = null;
+      const showArchived = screen.querySelector('.archived')?.open;
+      sheet.close();
+      render();
+      const archived = screen.querySelector('.archived');
+      if (showArchived && archived) archived.open = true;
+      const focusTarget = showArchived && archived ? archived.querySelector('summary') : document.querySelector('.top-add');
+      focusTarget.focus({ preventScroll: true });
+      say('Habit deleted.');
+      break;
+    }
     case 'restore': {
       const period = habit.inactivePeriods?.at(-1);
       if (period) period.to = today;

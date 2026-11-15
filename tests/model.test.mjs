@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { dayKey, scheduled, logSession, removeLog, entry, nextTarget, coreCharge, remaining, weekDays } from '../dist/model.mjs';
+import { dayKey, scheduled, logSession, removeLog, deleteHabit, entry, nextTarget, coreCharge, remaining, weekDays } from '../dist/model.mjs';
 
 test('date helpers give predictable local dates', () => {
   assert.equal(dayKey(new Date(2026, 10, 15, 12)), '2026-11-15');
@@ -45,4 +45,19 @@ test('optional growth is offered only after five target sessions', () => {
 test('crystal charge and countdown are bounded', () => {
   assert.equal(coreCharge([{id:'h',day:'2026-11-15'}],'2026-11-15',2).ratio,.5);
   assert.equal(remaining({endsAt:5000,remainingMs:10000},6000),0);
+});
+
+test('deleting an active or archived habit removes only its history and timer', () => {
+  for (const archived of [undefined, '2026-11-15']) {
+    const habit = { id: 'delete', archived };
+    const keptHabit = { id: 'keep' };
+    const deletedLog = { id: habit.id, day: '2026-11-14', minutes: 5 };
+    const keptLog = { id: keptHabit.id, day: '2026-11-14', minutes: 10 };
+    const state = { habits: [habit, keptHabit], logs: [deletedLog, keptLog], timer: { id: habit.id } };
+
+    assert.deepEqual(deleteHabit(state, habit.id), { habits: [keptHabit], logs: [keptLog], timer: null });
+    assert.deepEqual(state, { habits: [habit, keptHabit], logs: [deletedLog, keptLog], timer: { id: habit.id } });
+    assert.equal(deleteHabit(state, keptHabit.id).timer, state.timer);
+    assert.equal(deleteHabit(state, 'missing'), state);
+  }
 });

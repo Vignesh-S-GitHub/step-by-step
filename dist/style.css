@@ -228,6 +228,8 @@ input::placeholder{color:var(--muted)}
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
 .full-button{width:100%;min-height:44px}
 .subtle{display:flex;justify-content:center;align-items:center;color:var(--muted);border-radius:9px;font-weight:650}
+.danger{gap:6px;color:var(--error)}
+.danger-primary{background:var(--error);color:var(--on-accent)}
 .form-error{color:var(--error);font-size:12px}
 .clock{display:grid;justify-items:center;margin:12px 0 19px;gap:1px}
 .clock output{font-size:56px;font-weight:720;letter-spacing:-.035em;font-variant-numeric:tabular-nums;color:var(--accent)}

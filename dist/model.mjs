@@ -44,6 +44,18 @@ export function removeLog(state, id, day) {
   return original !== state.logs.length;
 }
 
+export function deleteHabit(state, id) {
+  const habits = state.habits.filter((habit) => habit.id !== id);
+  if (habits.length === state.habits.length) return state;
+
+  return {
+    ...state,
+    habits,
+    logs: state.logs.filter((log) => log.id !== id),
+    timer: state.timer?.id === id ? null : state.timer,
+  };
+}
+
 export function nextTarget(state, habit) {
   if (!habit.step || habit.minutes >= habit.cap) return null;
   const sessions = state.logs.filter((log) =>
