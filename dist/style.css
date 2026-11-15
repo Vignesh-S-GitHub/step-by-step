@@ -51,27 +51,55 @@
 html{min-width:280px;min-height:100%;background:var(--bg)}
 body{margin:0;background:var(--bg);
 color:var(--ink);font:14px/1.45 Inter,system-ui,sans-serif;-webkit-tap-highlight-color:transparent}
-/* The atmosphere follows the same palette as the ladder and app controls. */
+/* Fixed behind every route. Animated trails stay below the app controls. */
 .theme-atmosphere{
   position:fixed;inset:0;pointer-events:none;overflow:hidden;
   background:
-    radial-gradient(circle,color-mix(in srgb,var(--mote) 20%,transparent) .65px,transparent 1.15px) 7px 14px/137px 109px,
-    radial-gradient(circle,color-mix(in srgb,var(--mote) 13%,transparent) .85px,transparent 1.3px) 44px 72px/193px 151px;
+    radial-gradient(circle,color-mix(in srgb,var(--mote) 66%,transparent) .8px,transparent 1.35px) 19px 13px/191px 151px,
+    radial-gradient(circle,color-mix(in srgb,var(--mote) 40%,transparent) .62px,transparent 1.25px) 41px 36px/101px 87px,
+    radial-gradient(circle,color-mix(in srgb,var(--mote) 25%,transparent) .6px,transparent 1px) 4px 25px/79px 97px,
+    linear-gradient(158deg,color-mix(in srgb,var(--bg) 73%,#02030d),color-mix(in srgb,var(--bg) 39%,#02030d) 67%,var(--bg));
 }
 .theme-atmosphere::before,.theme-atmosphere::after{
-  content:"";position:absolute;inset:-18%;transition:opacity 660ms ease;animation:sky-drift 20s ease-in-out infinite alternate;
+  content:"";position:absolute;inset:-15%;transition:opacity 660ms ease;animation:sky-drift 27s ease-in-out infinite alternate;
 }
-.theme-atmosphere::before{opacity:calc(.68 + var(--momentum, 0) * .29)}
-.theme-atmosphere::after{opacity:calc(.64 + var(--momentum, 0) * .29)}
 .theme-atmosphere::before{
-  background:radial-gradient(ellipse at 74% 23%,color-mix(in srgb,var(--sky-a) 55%,transparent),transparent 47%);
+  opacity:calc(.62 + var(--momentum,0) * .28);
+  background:radial-gradient(ellipse at 76% 27%,color-mix(in srgb,var(--sky-a) 63%,transparent),transparent 46%);
 }
 .theme-atmosphere::after{
-  background:radial-gradient(ellipse at 29% 81%,color-mix(in srgb,var(--sky-b) 78%,transparent),transparent 53%);
-  animation-direction:alternate-reverse;animation-duration:25s;
+  opacity:calc(.48 + var(--momentum,0) * .25);
+  background:radial-gradient(ellipse at 24% 78%,color-mix(in srgb,var(--sky-b) 81%,transparent),transparent 55%);
+  animation-direction:alternate-reverse;animation-duration:32s;
+}
+.sky-meteor{
+  --travel-x:min(70vw,670px);--travel-y:min(45vw,430px);--meteor-angle:32deg;
+  position:absolute;z-index:1;left:13%;top:8%;width:clamp(72px,19vw,176px);height:1px;border-radius:50%;
+  opacity:0;transform-origin:right;transform:rotate(var(--meteor-angle));
+  background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--accent) 75%,transparent) 86%,var(--ink));
+  animation:sky-meteor 19s linear -.6s infinite;
+}
+.sky-meteor::after{
+  content:"";position:absolute;right:0;top:50%;translate:0 -50%;width:3px;height:3px;border-radius:50%;background:var(--ink);
+  box-shadow:0 0 9px 2px color-mix(in srgb,var(--accent) 60%,transparent);
+}
+.sky-meteor:nth-child(2){
+  --travel-x:min(57vw,525px);--travel-y:min(34vw,315px);--meteor-angle:30deg;
+  left:36%;top:36%;width:clamp(55px,14vw,135px);animation-duration:27s;animation-delay:5s;
+}
+.sky-meteor:nth-child(3){
+  --travel-x:min(75vw,715px);--travel-y:min(39vw,376px);--meteor-angle:27deg;
+  left:4%;top:67%;width:clamp(53px,11vw,117px);animation-duration:33s;animation-delay:12s;
 }
 @keyframes sky-drift{from{transform:translate3d(-3%,-2%,0) scale(1)}to{transform:translate3d(5%,3%,0) scale(1.08)}}
-@media(prefers-reduced-motion:reduce){.theme-atmosphere::before,.theme-atmosphere::after{animation:none}}
+@keyframes sky-meteor{
+  0%,5%{translate:0 0;opacity:0}
+  7%{opacity:.91}
+  12%,100%{translate:var(--travel-x) var(--travel-y);opacity:0}
+}
+@media(prefers-reduced-motion:reduce){
+  .theme-atmosphere::before,.theme-atmosphere::after,.sky-meteor{animation:none}
+}
 .layout{position:relative}
 ::selection{background:var(--accent);color:var(--on-accent)}
 button,input{font:inherit}
@@ -315,14 +343,10 @@ input::placeholder{color:var(--muted)}
   radial-gradient(circle,var(--mote) 1px,transparent 1.5px) 26px 10px/58px 47px,
   radial-gradient(circle,color-mix(in srgb,var(--mote) 57%,transparent) .6px,transparent 1px) 9px 31px/39px 63px}
 .ladder-live .ladder-fallback{display:none}
-.ladder-fallback i,.ladder-fallback b{position:absolute;display:block}
-.ladder-fallback i{width:12%;height:9%;transform:skewY(-14deg);border:1px solid var(--accent);border-radius:6px;background:linear-gradient(165deg,var(--accent),var(--sky-a));box-shadow:0 3px 12px var(--sky-b)}
-.ladder-fallback i:nth-child(1){left:52%;top:73%}
-.ladder-fallback i:nth-child(2){left:57%;top:64%}
-.ladder-fallback i:nth-child(3){left:64%;top:55%}
-.ladder-fallback i:nth-child(4){left:70%;top:42%}
-.ladder-fallback i:nth-child(5){left:72%;top:30%}
-.ladder-fallback b{top:20%;left:77%;width:10px;aspect-ratio:1;border-radius:50%;background:var(--accent);box-shadow:0 0 17px var(--accent)}
+.ladder-fallback svg{
+  position:absolute;left:68%;top:49%;height:72%;width:auto;
+  transform:translate(-50%,-50%) rotate(15deg);filter:drop-shadow(0 9px 15px var(--sky-a))
+}
 .ladder-journey{padding:0;margin:0;list-style:none}
 .ladder-journey li{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:8px;padding:7px 6px;border-bottom:1px solid var(--line);line-height:1.3}
 .ladder-journey li:last-child{border-bottom:0}

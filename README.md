@@ -1,6 +1,6 @@
 # Step by Step
 
-A gentle, visual habit tracker with the approved Rising Steps purple icon, dynamic themed backgrounds, and the interactive 3D **Cosmic Ladder**.
+A gentle, visual habit tracker with the approved Rising Steps purple icon, dynamic themed backgrounds, and the interactive 3D **Cosmic Flight**.
 
 ## Live site
 
@@ -12,7 +12,7 @@ The site is deployed automatically from the `dist/` directory through `.github/w
 
 - Small daily or selected-weekday habits with timed 5/10-minute (or custom) sessions and check-offs
 - Optional goal increases after five sessions, with a configurable maximum
-- Touch- and keyboard-interactive Cosmic Ladder with a zone every eight lifetime sessions and occasional golden steps
+- Touch- and keyboard-interactive Cosmic Flight with a zone every eight lifetime sessions and occasional golden steps
 - Theme-wide **Amethyst**, **Lagoon**, **Dusk**, and **Orbit** palettes with animated atmospheres that respond to today's progress
 - Matching SVG controls, accessible dropdowns, themed seven-day multiselect, responsive mobile navigation
 - Session history and progress charts; archived and paused habits
@@ -29,7 +29,7 @@ python -m http.server 8080 --directory dist
 
 Then open [http://localhost:8080](http://localhost:8080). The browser requires a local HTTP server for the service worker and ES modules.
 
-To check the scene on a phone, open Today, drag the ladder, tap the climber, and log a session. Open `?zone=5` to preview the Moon without changing saved progress. Change the app theme and reopen Today to compare the scenery.
+To check the scene on a phone, open Today, drag to orbit the scene, tap the rocket to fire the thruster, and log a session. Open `?zone=5` to preview the Moon without changing saved progress. Change the app theme and reopen Today to compare the scenery.
 
 Run regression tests with Node.js:
 
@@ -45,4 +45,4 @@ The published artifact is `dist/`, not the repository root. Keep relative asset 
 
 ## Privacy and limitations
 
-Habits, timer state, and completions are stored on this device in the current browser. They do not sync between browsers or devices. Use Settings → Download activity data to keep a backup. Import activity data merges a backup into the current data and skips duplicate habit/day sessions. The ladder can use its cached Three.js renderer offline and uses an interactive Canvas 2D fallback if WebGL or the renderer is unavailable.
+Habits, timer state, and completions are stored on this device in the current browser. They do not sync between browsers or devices. Use Settings → Download activity data to keep a backup. Import activity data merges a backup into the current data and skips duplicate habit/day sessions. Cosmic Flight can use its cached Three.js renderer offline and uses an interactive Canvas 2D fallback if WebGL or the renderer is unavailable.

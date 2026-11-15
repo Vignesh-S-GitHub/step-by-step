@@ -190,16 +190,26 @@ function chargeFor(day) {
 
 function ladderCard() {
   return `<section class="ladder-card" aria-labelledby="ladder-title">
-    <button class="ladder-stage" aria-disabled="true" type="button" aria-label="Cosmic Ladder" aria-describedby="ladder-controls">
-      <span class="ladder-fallback" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><b></b></span>
+    <button class="ladder-stage" aria-disabled="true" type="button" aria-label="Cosmic Flight" aria-describedby="ladder-controls">
+      <span class="ladder-fallback" aria-hidden="true">
+        <svg viewBox="0 0 82 140" focusable="false">
+          <path fill="var(--sky-a)" d="M30 84C20 88 14 100 11 111L31 105ZM53 83c11 5 16 17 18 27l-20-6Z"/>
+          <path fill="var(--accent)" d="M33 103h16c4 10-2 22-8 36-6-14-12-26-8-36Z"/>
+          <path fill="var(--ink)" d="M37 103h8c2 8-2 16-4 22-2-6-6-14-4-22Z"/>
+          <path fill="var(--muted)" d="M41 4C19 26 17 75 29 98c3 7 21 7 24 0C65 75 63 26 41 4Z"/>
+          <path fill="var(--accent)" d="M41 4c-6 6-11 14-15 25 9 4 20 4 30 0C52 18 47 10 41 4Z"/>
+          <circle cx="41" cy="53" r="11" fill="var(--sky-b)" stroke="var(--sky-a)" stroke-width="3"/>
+          <path stroke="var(--ink)" stroke-linecap="round" stroke-width="2" opacity=".75" d="M36 52c1-2 3-4 5-4"/>
+        </svg>
+      </span>
     </button>
     <div class="ladder-copy">
-      <h2 id="ladder-title">Cosmic Ladder</h2>
+      <h2 id="ladder-title">Cosmic Flight</h2>
       <p class="ladder-zone" data-ladder-label="zone"></p>
       <strong class="ladder-count" data-ladder-label="count"></strong>
       <p class="ladder-charge" data-ladder-charge></p>
     </div>
-    <button class="icon-button ladder-route" data-action="ladder-info" aria-label="Cosmic Ladder journey">${icon('spark', 18)}</button>
+    <button class="icon-button ladder-route" data-action="ladder-info" aria-label="Cosmic Flight journey">${icon('spark', 18)}</button>
     <span class="ladder-guide" id="ladder-controls">${icon('rotate', 13)} Drag to rotate</span>
   </section>`;
 }
@@ -213,7 +223,7 @@ function journey() {
 }
 
 function ladderInfo() {
-  openSheet('Cosmic Ladder journey', 'Every completed session adds a step. A new zone opens every eight steps.', `
+  openSheet('Cosmic Flight journey', 'Every completed session adds a step. A new zone opens every eight steps.', `
     ${journey()}<button class="subtle full-button" data-action="close">Done</button>`);
 }
 
@@ -281,7 +291,7 @@ function progressScreen() {
       <div class="chart" aria-label="Sessions completed each day">${weeklyCounts.map((count, i) => `<div class="chart-column" aria-label="${dateLabel(days[i], { weekday: 'long' })}, ${countLabel(count, 'session')}"><span class="bar-count">${count || '–'}</span><span class="bar-track"><i style="--height:${count / max}"></i></span><span>${weekdays[i]}</span></div>`).join('')}</div>
     </section>
     <section class="totals" aria-label="All-time activity"><div><strong>${total}</strong><span>Sessions</span></div><div><strong>${minutes}</strong><span>Minutes</span></div><div><strong>${state.goldenSteps.length}</strong><span>Golden steps</span></div></section>
-    <section class="collection" aria-labelledby="journey-title"><div class="section-title"><h2 id="journey-title">Cosmic Ladder</h2>${zone.name ? `<span class="completion">${zone.name}</span>` : ''}</div>${journey()}</section>
+    <section class="collection" aria-labelledby="journey-title"><div class="section-title"><h2 id="journey-title">Cosmic Flight</h2>${zone.name ? `<span class="completion">${zone.name}</span>` : ''}</div>${journey()}</section>
   </div>`;
 }
 
@@ -459,7 +469,7 @@ function complete(habit, fromTimer = false) {
   ladder?.addStep(golden);
   render();
   const afterSkill = mastery(state.logs, habit.id).level;
-  let message = golden ? 'Golden step added!' : 'Session logged. One step higher.';
+  let message = golden ? 'Golden step added!' : 'Session logged. Flight advanced.';
   if (afterSkill > beforeSkill) message += ` · Skill level ${afterSkill}`;
   say(message, true);
   screen.querySelector(`[data-action="toggle"][data-id="${habit.id}"]`)?.focus({ preventScroll: true });

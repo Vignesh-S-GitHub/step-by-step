@@ -2,7 +2,6 @@ import { normalizeGoldenSteps, stepsPerZone, zoneIndex, zones } from './model.mj
 
 const threeUrl = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.1/three.module.min.js';
 const spacing = .49;
-const stepWindow = 20;
 const palettes = {
   amethyst: ['#130825', '#582183', '#c47aff', '#edc7ff'],
   lagoon: ['#051b26', '#18606e', '#5dded6', '#cff9f0'],
@@ -123,7 +122,7 @@ export function mount(container) {
         : total.toLocaleString() + (total === 1 ? ' step' : ' steps');
     }
     container.dataset.zone = String(zoneIndex(sceneCount()));
-    stage.setAttribute('aria-label', 'Cosmic Ladder, ' + (debug === null ? zone.name : zones[debug].name || '') + ' ' + total + ' steps. Drag or use arrow keys to rotate. Press Enter to pulse.');
+    stage.setAttribute('aria-label', 'Cosmic Flight, ' + (debug === null ? zone.name : zones[debug].name || '') + ' ' + total + ' steps. Drag or use arrow keys to rotate. Press Enter to pulse.');
   }
   updateLabels();
   threePromise ??= import(threeUrl).catch((error) => { threePromise = undefined; throw error; });
@@ -348,32 +347,55 @@ function createView(T, stage) {
     return { group, rotating, materials, fade: -1 };
   });
 
-  // An extruded rounded shape keeps crisp highlights at any viewport size.
-  const shape = new T.Shape();
-  shape.moveTo(-.82, -.42); shape.lineTo(.82, -.42);
-  shape.quadraticCurveTo(.98, -.42, .98, -.27); shape.lineTo(.98, .27);
-  shape.quadraticCurveTo(.98, .42, .82, .42); shape.lineTo(-.82, .42);
-  shape.quadraticCurveTo(-.98, .42, -.98, .27); shape.lineTo(-.98, -.27);
-  shape.quadraticCurveTo(-.98, -.42, -.82, -.42);
-  const geometry = new T.ExtrudeGeometry(shape, { depth: .14, bevelSize: .055, bevelThickness: .048, bevelSegments: 2, steps: 1, curveSegments: 3 });
-  geometry.rotateX(-Math.PI / 2);
-  geometry.translate(0, -.08, 0);
-  const regular = new T.MeshStandardMaterial({ color: 0xbd7de4, roughness: .35, metalness: .30, emissive: 0x9d34d0, emissiveIntensity: .29 });
-  const trim = new T.MeshStandardMaterial({ color: 0xe1a6ff, roughness: .33, emissive: 0xc265df, emissiveIntensity: .46 });
-  const gold = new T.MeshStandardMaterial({ color: 0xffb353, roughness: .35, metalness: .22, emissive: 0xbe6b24, emissiveIntensity: .44 });
-  const goldTrim = new T.MeshStandardMaterial({ color: 0xffd992, roughness: .34, emissive: 0xdf912b, emissiveIntensity: .55 });
-  const steps = new T.InstancedMesh(geometry, [regular, trim], stepWindow);
-  const goldSteps = new T.InstancedMesh(geometry, [gold, goldTrim], stepWindow);
-  steps.frustumCulled = goldSteps.frustumCulled = false;
-  scene.add(steps, goldSteps);
-
+  // Lathed ceramic hull, beveled fins, and a recessed porthole.
+  const lathe = (profile) => new T.LatheGeometry(profile.map(([radius, y]) => new T.Vector2(radius, y)), lowPower ? 24 : 40);
   const actor = new T.Group();
-  const body = new T.Mesh(orbGeometry, new T.MeshStandardMaterial({ color: 0xf7d8ff, emissive: 0xd572e4, emissiveIntensity: .92, roughness: .29 }));
-  body.scale.set(.18, .22, .18);
-  actor.add(body);
-  const actorGlow = glow('glow', 0xe58ffe, .62, 1.08, 1.08, 0, 0, 0, actor);
+  actor.name = "Rocket";
+  const shell = new T.MeshStandardMaterial({ color: 0xe6dff2, roughness: .29, metalness: .32 });
+  const livery = new T.MeshStandardMaterial({ color: 0x8b53de, roughness: .30, metalness: .34, emissive: 0x42197d, emissiveIntensity: .3 });
+  const metal = new T.MeshStandardMaterial({ color: 0x635878, roughness: .30, metalness: .55 });
+  function rocketPart(geometry, material, parent = actor) {
+    const part = new T.Mesh(geometry, material);
+    parent.add(part);
+    return part;
+  }
+  rocketPart(lathe([[.31,-.79],[.41,-.68],[.49,-.43],[.53,-.12],[.54,.26],[.51,.55],[.44,.82],[.34,1.06],[.22,1.29],[.10,1.48],[0,1.58]]), shell);
+  rocketPart(lathe([[.351,1.05],[.26,1.22],[.171,1.39],[.095,1.5],[0,1.59]]), livery);
+  rocketPart(lathe([[.39,-.73],[.422,-.647],[.447,-.565],[.458,-.52]]), livery);
+  rocketPart(lathe([[.32,-.76],[.28,-.96],[.30,-1.12],[.24,-1.13],[.21,-1.00]]), metal);
+  const finShape = new T.Shape();
+  finShape.moveTo(.41, -.21);
+  finShape.quadraticCurveTo(.75, -.42, .92, -.91);
+  finShape.quadraticCurveTo(.94, -1.03, .81, -1.02);
+  finShape.lineTo(.43, -.86);
+  finShape.closePath();
+  const finGeometry = new T.ExtrudeGeometry(finShape, { depth: .08, bevelSize: .035, bevelThickness: .027, bevelSegments: 2, curveSegments: 9 });
+  for (let i = 0; i < 3; i++) rocketPart(finGeometry, livery).rotation.y = i * Math.PI * 2 / 3;
+  const window = new T.Group();
+  window.position.set(0, .39, .47);
+  actor.add(window);
+  rocketPart(new T.TorusGeometry(.239, .047, 12, 38), metal, window);
+  const glass = rocketPart(orbGeometry, new T.MeshStandardMaterial({ color: 0x224765, roughness: .17, metalness: .26, emissive: 0x245080, emissiveIntensity: .69 }), window);
+  glass.scale.set(.207, .207, .092);
+  const glint = rocketPart(orbGeometry, new T.MeshBasicMaterial({ color: 0xc3eafc }), window);
+  glint.position.set(-.075, .073, .077);
+  glint.scale.set(.063, .026, .012);
+  glint.rotation.z = .53;
+
+  const nozzle = new T.Group();
+  nozzle.name = "Thruster";
+  nozzle.position.y = -1.10;
+  actor.add(nozzle);
+  function exhaust(color, profile, opacity) {
+    return rocketPart(lathe(profile), new T.MeshBasicMaterial({
+      color, transparent: true, opacity, depthWrite: false, toneMapped: false,
+    }), nozzle);
+  }
+  const plume = exhaust(0xa74fff, [[0,-1.34],[.064,-1.05],[.14,-.77],[.22,-.48],[.24,-.20],[.19,0]], .54);
+  const flame = exhaust(0xf8c5ff, [[0,-.87],[.067,-.62],[.13,-.38],[.17,-.11],[.144,.012]], .90);
+  const exhaustGlow = glow('glow', 0xb178ff, .29, 1.6, 2.1, 0, -.53, 0, nozzle);
+  const trail = Array.from({ length: 4 }, (_, i) => glow('glow', 0xef9cff, .13 - i * .022, .30 - i * .042, .34 - i * .046, 0, 0, 0, scene));
   scene.add(actor);
-  const trail = Array.from({ length: 5 }, (_, index) => glow('glow', 0xe38bff, .13 - index * .019, .3 - index * .032, .3 - index * .032, 0, 0, 0, scene));
   const pulseMaterial = new T.MeshBasicMaterial({ color: 0xeac2ff, transparent: true, opacity: 0, depthWrite: false, side: T.DoubleSide });
   const ring = new T.Mesh(new T.RingGeometry(.94, 1, 48), pulseMaterial);
   ring.rotation.x = Math.PI * -.5;
@@ -435,9 +457,7 @@ function createView(T, stage) {
   scene.add(streaks);
   const shootingStar = glow('glow', 0xc6d7ff, .42, 2.3, .075, 0, 0, -15, scene, -.48);
 
-  const dummy = new T.Object3D();
   const scratch = new T.Vector3();
-  const actorFrom = new T.Vector3();
   const actorTo = new T.Vector3();
   const actorPoint = new T.Vector3();
   const cameraTarget = new T.Vector3();
@@ -445,31 +465,12 @@ function createView(T, stage) {
   const themeBase = new T.Color(), themeHighlight = new T.Color(), themeEdge = new T.Color();
   const paletteColors = scenicSkies.map((color) => new T.Color(color));
   let themeName, frame = 0, last = 0, elapsed = 0, seen = true, lost = false;
-  let lastDrop = NaN, lastTop, lastHorizon;
+  let lastTop, lastHorizon;
   let total = 0, followed = 0, goldenSet = new Set(), jumping, pulsing;
   let angle = .63, targetAngle = angle, tilt = .23, targetTilt = tilt, drag;
 
-  function stepPoint(step, target) {
-    const turn = step * .56;
-    return target.set(Math.sin(turn) * 1.66, step * spacing, Math.cos(turn) * 1.66);
-  }
-
-  function paintSteps(drop = 0) {
-    let normalIndex = 0, goldIndex = 0;
-    for (let step = Math.max(0, total - stepWindow + 1); step <= total; step++) {
-      const turn = step * .56;
-      stepPoint(step, dummy.position);
-      if (step === total) dummy.position.y += drop;
-      dummy.rotation.y = turn;
-      dummy.scale.setScalar(step === 0 ? 1.22 : 1);
-      dummy.updateMatrix();
-      if (goldenSet.has(step)) goldSteps.setMatrixAt(goldIndex++, dummy.matrix);
-      else steps.setMatrixAt(normalIndex++, dummy.matrix);
-    }
-    steps.count = normalIndex;
-    goldSteps.count = goldIndex;
-    steps.instanceMatrix.needsUpdate = goldSteps.instanceMatrix.needsUpdate = true;
-  }
+  const warmPlume = new T.Color(0xff933f);
+  const warmFlame = new T.Color(0xffe7a5);
 
   function updateTheme() {
     const theme = document.documentElement.dataset.theme;
@@ -477,19 +478,16 @@ function createView(T, stage) {
     themeName = theme;
     const [base, high, highlight, edge] = Object.hasOwn(palettes, theme) ? palettes[theme] : palettes.amethyst;
     themeBase.set(base); themeSky.set(high); themeHighlight.set(highlight); themeEdge.set(edge);
-    regular.color.copy(themeHighlight).multiplyScalar(.75);
-    regular.emissive.copy(themeSky);
-    trim.color.copy(themeHighlight);
-    trim.emissive.copy(themeHighlight).multiplyScalar(.55);
-    body.material.color.copy(themeEdge);
-    body.material.emissive.copy(themeHighlight);
-    actorGlow.material.color.copy(themeHighlight);
+    livery.color.copy(themeHighlight).multiplyScalar(.58);
+    livery.emissive.copy(themeSky);
+    shell.color.setHex(0xdeddec).lerp(themeEdge, .24);
+    exhaustGlow.material.color.copy(themeHighlight);
     pulseMaterial.color.copy(themeEdge);
     for (const light of trail) light.material.color.copy(themeHighlight);
   }
 
   function updateScenery(progress) {
-    // Scenery centers are spaced at triple the full height of a stair zone.
+    // Scenery centers are spaced at triple the full height of a flight zone.
     const separation = stepsPerZone * spacing * 3;
     const current = zoneIndex(progress);
     const boundary = (current + 1) * stepsPerZone;
@@ -567,22 +565,26 @@ function createView(T, stage) {
   function draw() {
     updateTheme();
     const time = jumping ? elapsed - jumping.at : 2;
-    const hop = smooth(time / .62);
-    stepPoint(total, actorTo); stepPoint(Math.max(0, total - 1), actorFrom);
-    // A decaying spring offsets the new stair and a second arc carries the climber.
-    const drop = time < .72 ? .68 * Math.exp(-time * 5.5) * Math.cos(time * 19) : 0;
-    if (drop !== lastDrop) {
-      paintSteps(drop);
-      lastDrop = drop;
-    }
-    actorPoint.copy(actorFrom).lerp(actorTo, hop);
-    actorPoint.y += .36 + (reduced.matches ? 0 : .085 * Math.sin(elapsed * 2.25) + Math.sin(hop * Math.PI) * .88);
+    const pulseTime = pulsing === undefined ? 2 : elapsed - pulsing;
+    const boost = Math.max(0, 1 - Math.min(time, pulseTime) / .92);
+    const lift = time < .96 ? Math.sin(Math.PI * smooth(time / .96)) * .93 : 0;
+    const bob = reduced.matches ? 0 : Math.sin(elapsed * 2.2) * .067;
+    actorTo.set(.16, followed * spacing + .37, .20);
+    actorPoint.copy(actorTo);
+    actorPoint.x += .20 * lift;
+    actorPoint.y += bob + lift;
     actor.position.copy(actorPoint);
+    actor.rotation.y = angle * .56 + .29;
+    actor.rotation.z = -.23 - boost * .17;
+    const flicker = reduced.matches ? 0 : Math.sin(elapsed * 27) * .075 + Math.sin(elapsed * 43) * .025;
+    nozzle.scale.set(1 + boost * .19, .56 + boost * 1.01 + flicker, 1 + boost * .19);
+    const golden = jumping?.golden && time < 1.1;
+    plume.material.color.copy(golden ? warmPlume : themeHighlight);
+    flame.material.color.copy(golden ? warmFlame : themeEdge);
+    exhaustGlow.material.opacity = .26 + boost * .26;
     for (const [i, light] of trail.entries()) {
-      light.visible = !reduced.matches && time < 1.18;
-      const t = smooth(Math.max(0, time - (i + 1) * .044) / .62);
-      light.position.copy(actorFrom).lerp(actorTo, t);
-      light.position.y += .28 + Math.sin(t * Math.PI) * .85;
+      light.visible = !reduced.matches && boost > .1;
+      light.position.set(actorPoint.x - .36 - i * .15, actorPoint.y - 1.9 - i * .30 - .13 * flicker, actorPoint.z);
     }
     if (!reduced.matches) paintEffects();
     else {
@@ -596,10 +598,10 @@ function createView(T, stage) {
     const shooting = elapsed % 17;
     shootingStar.visible = !reduced.matches && shooting > 13 && shooting < 14;
     shootingStar.position.set(-12 + (shooting - 13) * 23, followed * spacing + 7 - (shooting - 13) * 6, -15);
-    const radius = 9.6 + Math.min(2.35, Math.log1p(total) * .52);
+    const radius = 8.8 + Math.min(1.1, Math.log1p(total) * .24);
     const nudge = time < .6 ? Math.sin(time / .6 * Math.PI) * .13 : 0;
     camera.position.set(Math.sin(angle) * radius, followed * spacing + tilt * radius + nudge, Math.cos(angle) * radius);
-    cameraTarget.set(0, followed * spacing - .86, 0);
+    cameraTarget.set(0, followed * spacing + .08, 0);
     camera.lookAt(cameraTarget);
     renderer.render(scene, camera);
   }
@@ -694,7 +696,7 @@ function createView(T, stage) {
   function endDrag(event) {
     if (event.pointerId !== drag?.id) return;
     if (!drag.moved && event.type === 'pointerup') {
-      // Test the tap against the climber's projected center rather than the whole landscape.
+      // Test the tap against the rocket's projected center rather than the whole landscape.
       const rect = stage.getBoundingClientRect();
       scratch.copy(actor.position).project(camera);
       const x = rect.left + (scratch.x + 1) * rect.width / 2;
@@ -730,7 +732,6 @@ function createView(T, stage) {
     sync(count, golden, animate, warp = false) {
       total = count;
       goldenSet = new Set(golden);
-      lastDrop = NaN;
       if (animate && !reduced.matches) {
         const goldenStep = goldenSet.has(total);
         jumping = { at: elapsed, golden: goldenStep, warp };
@@ -765,8 +766,6 @@ function createView(T, stage) {
         if (node.geometry) geometries.add(node.geometry);
         for (const material of [node.material].flat()) if (material) materials.add(material);
       });
-      steps.dispose();
-      goldSteps.dispose();
       for (const geometry of geometries) geometry.dispose();
       for (const material of materials) material.dispose();
       for (const texture of textures.values()) texture.dispose();
@@ -790,8 +789,8 @@ function createCanvasFallback(stage) {
   const options = { signal: events.signal };
   const dust = Array.from({ length: 115 }, (_, i) => [hash(i, 621), hash(i, 622), hash(i, 623), hash(i, 624)]);
   let width = 0, height = 0, frame = 0, last = 0, time = 0, visible = true;
-  let count = 0, gold = new Set(), change, pulse, angle = .48, drag;
-  let climberX = 0, climberY = 0;
+  let count = 0, change, pulse, angle = .48, drag;
+  let rocketX = 0, rocketY = 0;
 
   function halo(x, y, radius, color, opacity) {
     const glow = ctx.createRadialGradient(x, y, 0, x, y, radius);
@@ -898,6 +897,123 @@ function createCanvasFallback(stage) {
     }
   }
 
+  function drawRocket(x, y, size, palette, boost, golden) {
+    const main = golden ? '#ff9c4a' : palette[2];
+    const light = golden ? '#ffe5a1' : palette[3];
+    const yaw = Math.sin(angle);
+    const flicker = reduced.matches ? 0 : Math.sin(time * 25) * 3.4 + Math.sin(time * 41) * 1.3;
+    const length = 31 + boost * 36 + flicker;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(.24 + yaw * .08 + boost * .13);
+    ctx.scale(size, size);
+
+    halo(0, 43 + boost * 10, 30 + boost * 10, main, .36 + boost * .23);
+    const exhaust = ctx.createLinearGradient(0, 35, 0, 35 + length);
+    exhaust.addColorStop(0, light);
+    exhaust.addColorStop(.27, main);
+    exhaust.addColorStop(.78, main + '88');
+    exhaust.addColorStop(1, main + '00');
+    ctx.fillStyle = exhaust;
+    ctx.beginPath();
+    ctx.moveTo(-10, 34);
+    ctx.bezierCurveTo(-15, 46, -5, 57 + length * .42, 0, 35 + length);
+    ctx.bezierCurveTo(5, 57 + length * .42, 15, 46, 10, 34);
+    ctx.fill();
+    const core = ctx.createLinearGradient(0, 35, 0, 35 + length * .62);
+    core.addColorStop(0, '#fff0dd');
+    core.addColorStop(.43, light);
+    core.addColorStop(1, light + '00');
+    ctx.fillStyle = core;
+    ctx.beginPath();
+    ctx.moveTo(-6, 34);
+    ctx.quadraticCurveTo(-7, 45, 0, 35 + length * .64);
+    ctx.quadraticCurveTo(7, 45, 6, 34);
+    ctx.fill();
+
+    for (let i = 0; i < 5; i++) {
+      const age = reduced.matches ? i / 6 : fract(time * (.72 + boost * .35) + i / 5);
+      ctx.globalAlpha = (1 - age) * (.27 + boost * .29);
+      ctx.fillStyle = light;
+      ctx.beginPath();
+      ctx.arc((hash(i, 18) - .5) * (10 + age * 20), 43 + age * length, 1.1 + (1 - age), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    const fin = ctx.createLinearGradient(-28, 13, 24, 38);
+    fin.addColorStop(0, palette[2]);
+    fin.addColorStop(.56, palette[1]);
+    fin.addColorStop(1, palette[2]);
+    ctx.fillStyle = fin;
+    for (const side of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(side * 14, 4);
+      ctx.bezierCurveTo(side * 24, 12, side * (29 + yaw * 2), 27, side * (30 + yaw * 2), 38);
+      ctx.quadraticCurveTo(side * 29, 43, side * 24, 39);
+      ctx.lineTo(side * 12, 32);
+      ctx.fill();
+    }
+    const bell = ctx.createLinearGradient(-12, 0, 14, 0);
+    bell.addColorStop(0, '#302740');
+    bell.addColorStop(.42, '#9285aa');
+    bell.addColorStop(1, '#3a2b58');
+    ctx.fillStyle = bell;
+    ctx.beginPath();
+    ctx.moveTo(-11, 27);
+    ctx.lineTo(-12, 36);
+    ctx.quadraticCurveTo(0, 41, 12, 36);
+    ctx.lineTo(11, 27);
+    ctx.fill();
+
+    const ceramic = ctx.createLinearGradient(-20, 0, 20, 0);
+    ceramic.addColorStop(0, '#9787af');
+    ceramic.addColorStop(.28, '#d9cde8');
+    ceramic.addColorStop(.47, '#f6eafb');
+    ceramic.addColorStop(1, '#83739f');
+    ctx.fillStyle = ceramic;
+    ctx.beginPath();
+    ctx.moveTo(0, -51);
+    ctx.bezierCurveTo(-27, -28, -24, 17, -13, 31);
+    ctx.quadraticCurveTo(0, 37, 13, 31);
+    ctx.bezierCurveTo(24, 17, 27, -28, 0, -51);
+    ctx.fill();
+    ctx.save();
+    ctx.clip();
+    ctx.fillStyle = fin;
+    ctx.beginPath();
+    ctx.moveTo(-27, -57);
+    ctx.lineTo(29, -57);
+    ctx.lineTo(29, -30);
+    ctx.quadraticCurveTo(0, -24, -28, -30);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(-24, 23);
+    ctx.quadraticCurveTo(0, 31, 24, 23);
+    ctx.lineTo(24, 28);
+    ctx.quadraticCurveTo(0, 36, -24, 28);
+    ctx.fill();
+    ctx.restore();
+
+    const lensX = yaw * 5;
+    const glass = ctx.createRadialGradient(lensX - 3, -15, 1, lensX, -10, 12);
+    glass.addColorStop(0, '#a1ddef');
+    glass.addColorStop(.52, '#385e90');
+    glass.addColorStop(1, '#17203e');
+    ctx.strokeStyle = '#675680';
+    ctx.lineWidth = 2.4;
+    ctx.fillStyle = glass;
+    ctx.beginPath();
+    ctx.ellipse(lensX, -10, 10 - Math.abs(yaw) * 1.5, 10, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#d6f5f9b0';
+    ctx.beginPath();
+    ctx.ellipse(lensX - 3.4, -13.4, 3.2, 1.2, -.62, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
   function draw() {
     if (!width || !height) return;
     const palette = palettes[document.documentElement.dataset.theme] ?? palettes.amethyst;
@@ -922,42 +1038,13 @@ function createCanvasFallback(stage) {
     drawScenery(zone, center, unit);
     ctx.globalAlpha = 1;
 
-    const path = (step) => {
-      const phase = angle + step * .66;
-      return [center + Math.sin(phase) * unit * .28, height * .44 + (count - step) * unit * .093 + Math.cos(phase) * unit * .075];
-    };
-    const stepWidth = unit * .29, stepHeight = unit * .048;
-    for (let step = Math.max(0, count - 10); step <= count; step++) {
-      const [x, baseY] = path(step);
-      const y = step === count && age < .7 ? baseY - Math.exp(-age * 6) * Math.cos(age * 19) * unit * .13 : baseY;
-      const gradient = ctx.createLinearGradient(x, y - stepHeight, x, y + stepHeight);
-      gradient.addColorStop(0, gold.has(step) ? '#ffde8b' : palette[3]);
-      gradient.addColorStop(.35, gold.has(step) ? '#d58237' : palette[2]);
-      gradient.addColorStop(1, gold.has(step) ? '#76432d' : palette[1]);
-      ctx.fillStyle = gradient;
-      ctx.strokeStyle = gold.has(step) ? '#ffc16f' : palette[3];
-      ctx.lineWidth = .65;
-      ctx.beginPath();
-      const pitch = Math.cos(angle + step * .66) * stepWidth * .15;
-      ctx.moveTo(x - stepWidth / 2, y + pitch);
-      ctx.lineTo(x + stepWidth / 2, y - pitch);
-      ctx.lineTo(x + stepWidth / 2 - 4, y - pitch + stepHeight);
-      ctx.lineTo(x - stepWidth / 2 + 4, y + pitch + stepHeight);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-    }
-
-    const [fromX, fromY] = path(Math.max(0, count - 1));
-    const [toX, toY] = path(count);
-    const hop = smooth(age / .62);
-    climberX = mix(fromX, toX, hop);
-    climberY = mix(fromY, toY, hop) - unit * (.075 + .16 * Math.sin(hop * Math.PI) + .012 * Math.sin(time * 2.35));
-    halo(climberX, climberY, unit * .105, palette[2], .67);
-    ctx.fillStyle = gold.has(count) ? '#ffd899' : palette[3];
-    ctx.beginPath();
-    ctx.arc(climberX, climberY, unit * .021, 0, Math.PI * 2);
-    ctx.fill();
+    const boost = 1 - smooth(Math.min(age, pulse === undefined ? 2 : time - pulse) / .92);
+    const toX = center + Math.sin(angle) * unit * .071;
+    const toY = height * .44;
+    const lift = age < 1 ? Math.sin(Math.PI * smooth(age)) * unit * .18 : 0;
+    rocketX = toX + lift * .24;
+    rocketY = toY - lift - Math.sin(time * 2.35) * unit * .02;
+    drawRocket(rocketX, rocketY, unit * .0075, palette, boost, change?.golden && age < 1.1);
     const ring = Math.min(age, pulse === undefined ? 2 : time - pulse);
     if (ring < .8) {
       ctx.globalAlpha = (1 - ring / .8) * .68;
@@ -1036,7 +1123,7 @@ function createCanvasFallback(stage) {
     if (event.pointerId !== drag?.id) return;
     const rect = stage.getBoundingClientRect();
     if (event.type === 'pointerup' && !drag.moved && !reduced.matches &&
-        Math.hypot(event.clientX - rect.left - climberX, event.clientY - rect.top - climberY) < 40) pulse = time;
+        Math.hypot(event.clientX - rect.left - rocketX, event.clientY - rect.top - rocketY) < 40) pulse = time;
     drag = undefined;
     start();
   }
@@ -1051,8 +1138,7 @@ function createCanvasFallback(stage) {
   return {
     sync(next, golden, animate, warp) {
       count = next;
-      gold = new Set(golden);
-      change = animate && !reduced.matches ? { at: time, golden: gold.has(count), warp } : undefined;
+      change = animate && !reduced.matches ? { at: time, golden: golden.includes(count), warp } : undefined;
       start();
     },
     destroy() {
