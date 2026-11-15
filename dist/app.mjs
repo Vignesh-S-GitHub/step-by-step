@@ -30,6 +30,7 @@ const icons = {
 };
 const categories = { movement: 'Movement', read: 'Reading', calm: 'Mindfulness', learn: 'Learning', write: 'Writing', other: 'Other' };
 const weekdays = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+const repeatDays = [[1,'Mo'],[2,'Tu'],[3,'We'],[4,'Th'],[5,'Fr'],[6,'Sa'],[0,'Su']];
 const routes = { today: 'Today', habits: 'Habits', progress: 'Progress' };
 const coreRanks = ['Dormant', 'Spark', 'Prism', 'Radiant', 'Nova', 'Ascended'];
 
@@ -243,9 +244,9 @@ function todayScreen() {
 }
 
 function habitsScreen() {
-  const habits = scheduled(state.habits, today);
+  const habits = state.habits.filter((habit) => !habit.archived && habit.created <= today);
   const archived = state.habits.filter((habit) => habit.archived);
-  return `<section class="habit-section manage-section" aria-labelledby="manage-title"><div class="section-title"><h2 id="manage-title">Every day</h2><span class="completion">${countLabel(habits.length, 'habit')}</span></div>
+  return `<section class="habit-section manage-section" aria-labelledby="manage-title"><div class="section-title"><h2 id="manage-title">Your habits</h2><span class="completion">${countLabel(habits.length, 'habit')}</span></div>
     ${habits.length ? `<ul class="habit-list">${habits.map((habit) => row(habit, true)).join('')}</ul>` : '<div class="empty"><p>Start with one activity you can do in five minutes.</p><button class="small-action" data-action="add">Add a habit</button></div>'}
     ${archived.length ? `<details class="archived"><summary>Archived habits (${archived.length})</summary><ul class="habit-list">${archived.map((habit) => `<li class="habit-row"><div class="habit-copy"><strong>${safe(habit.name)}</strong></div><button class="small-action" data-action="restore" data-id="${habit.id}">Restore</button></li>`).join('')}</ul></details>` : ''}
   </section>`;
@@ -275,6 +276,8 @@ function progressScreen() {
 
 function render({ resetScroll = false } = {}) {
   coreObserver.disconnect();
+  const todayCharge = coreCharge(state.logs, today, scheduled(state.habits, today).length);
+  document.documentElement.style.setProperty('--momentum', String(todayCharge.ratio));
   navigation();
   document.querySelector('#screen-title').textContent = routes[route];
   document.querySelector('#screen-subtitle').textContent = route === 'today'
@@ -307,9 +310,10 @@ function habitForm(habit) {
     <form id="habit-form" data-id="${habit?.id || ''}">
       <label>Activity name<input name="name" maxlength="48" required value="${safe(value.name)}" placeholder="e.g. Stretch after work"></label>
       <label>Category<select name="category">${Object.entries(categories).map(([id, name]) => `<option value="${id}" ${id === value.category ? 'selected' : ''}>${name}</option>`).join('')}</select></label>
+      <fieldset class="weekday-field"><legend>Repeat on</legend><div class="weekday-options">${repeatDays.map(([day,label]) => `<label class="weekday-option"><input type="checkbox" name="weekdays" value="${day}" ${(value.weekdays ?? [0,1,2,3,4,5,6]).includes(day) ? 'checked' : ''}><span>${label}</span></label>`).join('')}</div></fieldset>
       <div class="form-grid"><label>Daily minutes<input name="minutes" type="number" min="1" max="180" required inputmode="numeric" value="${value.minutes}"></label>
       <label>Increase by<select name="step">${[0, 1, 2, 5, 10].map((step) => `<option value="${step}" ${step === value.step ? 'selected' : ''}>${step ? step + ' min' : 'Keep current'}</option>`).join('')}</select></label></div>
-      <label data-cap ${value.step ? '' : 'hidden'}>Maximum minutes<input name="cap" type="number" min="1" max="180" ${value.step ? 'required' : 'disabled'} inputmode="numeric" value="${value.cap}"><small>After ${TARGET_SESSIONS} sessions at your target, Cairn offers an increase.</small></label>
+      <label data-cap ${value.step ? '' : 'hidden'}>Maximum minutes<input name="cap" type="number" min="1" max="180" ${value.step ? 'required' : 'disabled'} inputmode="numeric" value="${value.cap}"><small>After ${TARGET_SESSIONS} sessions at your target, Step by Step offers an increase.</small></label>
       <p class="form-error" role="alert" hidden></p>
       <button class="primary full-button" type="submit">${habit ? 'Save changes' : 'Add daily habit'}</button>
       ${habit ? `<button class="subtle full-button" type="button" data-action="archive" data-id="${habit.id}">Archive habit</button>` : ''}
@@ -430,7 +434,14 @@ document.addEventListener('submit', (event) => {
   const minutes = Number(data.get('minutes'));
   const step = Number(data.get('step'));
   const cap = step ? Number(data.get('cap')) : minutes;
+  const selectedWeekdays = data.getAll('weekdays').map(Number);
   const error = form.querySelector('.form-error');
+  if (!selectedWeekdays.length) {
+    error.textContent = 'Choose at least one day for this habit.';
+    error.hidden = false;
+    form.querySelector('input[name="weekdays"]').focus();
+    return;
+  }
   if (!name || cap < minutes) {
     error.textContent = !name ? 'Enter an activity name.' : 'Maximum minutes must be at least the daily target.';
     error.hidden = false;
@@ -438,7 +449,7 @@ document.addEventListener('submit', (event) => {
     return;
   }
   const habit = state.habits.find((item) => item.id === form.dataset.id);
-  const values = { name, category: data.get('category'), minutes, step, cap };
+  const values = { name, category: data.get('category'), minutes, step, cap, weekdays: selectedWeekdays };
   if (habit) {
     if (habit.minutes !== minutes) habit.targetSince = today;
     Object.assign(habit, values);
@@ -449,7 +460,7 @@ document.addEventListener('submit', (event) => {
   save();
   sheet.close();
   render({ resetScroll: true });
-  say(habit ? 'Habit updated.' : 'Daily habit added.');
+  say(habit ? 'Habit updated.' : 'Habit added.');
 });
 
 document.addEventListener('change', (event) => {
