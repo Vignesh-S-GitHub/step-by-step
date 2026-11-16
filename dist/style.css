@@ -371,11 +371,6 @@ input::placeholder{color:var(--muted)}
 .ladder-stage canvas{position:absolute;inset:0;display:block;width:100%;height:100%;pointer-events:none}
 .ladder-stage:not(.ladder-live) canvas{visibility:hidden}
 .ladder-card::after{content:"";position:absolute;z-index:1;inset:0;pointer-events:none;background:linear-gradient(90deg,var(--bg),color-mix(in srgb,var(--bg) 83%,transparent) 23%,transparent 64%)}
-.flight-trail{position:absolute;z-index:1;right:22%;bottom:3%;width:35%;height:41%;pointer-events:none;overflow:visible}
-.flight-trail path{fill:none;vector-effect:non-scaling-stroke;stroke:var(--accent);stroke-linecap:round}
-.flight-trail-guide{stroke-width:1.45;stroke-dasharray:1 4;opacity:.38}
-.flight-trail-live{stroke-width:2.2;stroke-dasharray:var(--trail-fill,0) 100;opacity:0;filter:drop-shadow(0 0 5px var(--accent));transition:stroke-dasharray 480ms ease,opacity 220ms ease}
-.flight-trail.is-lit .flight-trail-live{opacity:.84}
 .ladder-copy{position:absolute;z-index:2;left:24px;top:50%;transform:translateY(-50%);max-width:51%;pointer-events:none}
 .ladder-copy h2{font-size:28px;line-height:1.05;letter-spacing:-.035em}
 .ladder-zone{margin-top:8px;font-size:12px;font-weight:690;color:var(--accent)}
@@ -404,7 +399,6 @@ input::placeholder{color:var(--muted)}
 @media(max-width:760px){
   .ladder-card{flex:none;min-height:clamp(145px,23dvh,218px);border-radius:15px}
   .ladder-copy{left:13px;max-width:52%}
-  .flight-trail{right:17%;width:37%;height:38%}
   .ladder-copy h2{font-size:21px}
   .ladder-zone{margin-top:6px;font-size:11px}
   .ladder-count{font-size:17px}

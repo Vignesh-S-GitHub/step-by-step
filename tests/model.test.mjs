@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { dayKey, scheduled, logSession, removeLog, deleteHabit, entry, nextTarget, dayCompletion, remaining, weekDays, mergeBackup, zoneIndex, zones, nextDestination, canEditCheckIn, checkInDays, weeklyGoalProgress, flightTrailSteps, skyPhase, timerProgress, moveRocket } from '../dist/model.mjs';
+import { dayKey, scheduled, logSession, removeLog, deleteHabit, entry, nextTarget, dayCompletion, remaining, weekDays, mergeBackup, zoneIndex, zones, nextDestination, canEditCheckIn, checkInDays, weeklyGoalProgress, skyPhase, timerProgress, moveRocket } from '../dist/model.mjs';
 
 test('date helpers give predictable local dates', () => {
   assert.equal(dayKey(new Date(2026, 10, 15, 12)), '2026-11-15');
@@ -130,10 +130,6 @@ test('backup restores an optional weekly goal and keeps an existing preference',
   assert.equal(mergeBackup({ ...state, weeklyGoal: 3 }, backup).weeklyGoal, 3);
   assert.equal(mergeBackup({ ...state, weeklyGoal: null }, backup).weeklyGoal, null);
   assert.equal(mergeBackup(state, { ...backup, weeklyGoal: 8 }).weeklyGoal, undefined);
-});
-
-test('the glowing trail fills each eight-step flight leg', () => {
-  assert.deepEqual([0, 1, 7, 8, 9, 16, 64, 65].map(flightTrailSteps), [0, 1, 7, 8, 1, 8, 8, 1]);
 });
 
 test('the sky tint transitions at local morning, midday, evening and night', () => {

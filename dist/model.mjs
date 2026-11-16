@@ -109,10 +109,6 @@ export function zoneIndex(sessions) {
   return Math.min(zones.length - 1, Math.floor(Math.max(0, sessions) / stepsPerZone));
 }
 
-export function flightTrailSteps(sessions) {
-  return sessions > 0 ? (sessions - 1) % stepsPerZone + 1 : 0;
-}
-
 export function skyPhase(hour) {
   if (hour < 5 || hour >= 21) return 'night';
   if (hour < 12) return 'morning';

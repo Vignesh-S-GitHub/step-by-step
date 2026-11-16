@@ -1,5 +1,5 @@
 import { mount as mountLadder } from './cosmicLadder.js';
-import { TARGET_SESSIONS, dayKey, shiftDay, weekDays, scheduled, entry, logSession, removeLog, deleteHabit, nextTarget, dayCompletion, mastery, remaining, mergeBackup, normalizeGoldenSteps, stepsPerZone, zoneIndex, zones, nextDestination, checkInDays, canEditCheckIn, normalizeWeeklyGoal, weeklyGoalProgress, flightTrailSteps, skyPhase, timerProgress } from './model.mjs';
+import { TARGET_SESSIONS, dayKey, shiftDay, weekDays, scheduled, entry, logSession, removeLog, deleteHabit, nextTarget, dayCompletion, mastery, remaining, mergeBackup, normalizeGoldenSteps, stepsPerZone, zoneIndex, zones, nextDestination, checkInDays, canEditCheckIn, normalizeWeeklyGoal, weeklyGoalProgress, skyPhase, timerProgress } from './model.mjs';
 
 const icons = {
   today: '<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M16 3v4M8 3v4M3 10h18"/><path d="m9 15 2 2 4-4"/>',
@@ -207,10 +207,6 @@ function ladderCard() {
         </svg>
       </span>
     </button>
-    <svg class="flight-trail" viewBox="0 0 180 70" preserveAspectRatio="none" aria-hidden="true">
-      <path class="flight-trail-guide" pathLength="100" d="M6 62C59 60 103 53 141 24Q152 15 158 5"/>
-      <path class="flight-trail-live" pathLength="100" d="M6 62C59 60 103 53 141 24Q152 15 158 5"/>
-    </svg>
     <div class="ladder-copy">
       <h2 id="ladder-title">Cosmic Flight</h2>
       <p class="ladder-zone" data-ladder-label="zone"></p>
@@ -357,10 +353,6 @@ function render({ resetScroll = false } = {}) {
     else slot.outerHTML = ladderCard();
     const card = screen.querySelector('.ladder-card');
     const charge = chargeFor(selected);
-    const trailSteps = flightTrailSteps(state.logs.length);
-    const trail = card.querySelector('.flight-trail');
-    trail.style.setProperty('--trail-fill', String(trailSteps / stepsPerZone * 100));
-    trail.classList.toggle('is-lit', trailSteps > 0);
     const destination = nextDestination(state.logs.length);
     const next = card.querySelector('[data-ladder-next]');
     next.hidden = !destination;
