@@ -452,9 +452,6 @@ function createView(T, stage) {
   const ring = new T.Mesh(new T.RingGeometry(.94, 1, 48), pulseMaterial);
   ring.rotation.x = Math.PI * -.5;
   scene.add(ring);
-  const beamMaterial = new T.MeshBasicMaterial({ color: 0xffbd61, transparent: true, opacity: 0, depthWrite: false });
-  const beam = new T.Mesh(new T.CylinderGeometry(.055, .20, 16, 12, 1, true), beamMaterial);
-  scene.add(beam);
 
   function starLayer(count, depth, seed) {
     const positions = [], appearances = [], colors = [];
@@ -500,13 +497,6 @@ function createView(T, stage) {
   particles.frustumCulled = false;
   scene.add(particles);
 
-  const warpData = new Float32Array(27 * 6);
-  const warpShape = new T.BufferGeometry();
-  warpShape.setAttribute('position', new T.BufferAttribute(warpData, 3).setUsage(T.DynamicDrawUsage));
-  const warpMaterial = new T.LineBasicMaterial({ color: 0xdeccff, transparent: true, depthWrite: false, opacity: 0 });
-  const streaks = new T.LineSegments(warpShape, warpMaterial);
-  streaks.frustumCulled = false;
-  scene.add(streaks);
   const shootingStar = glow('glow', 0xc6d7ff, .42, 2.3, .075, 0, 0, -15, scene, -.48);
 
   const scratch = new T.Vector3();
@@ -586,8 +576,6 @@ function createView(T, stage) {
     ring.scale.setScalar(.25 + pulse * 2.8);
     pulseMaterial.opacity = (1 - clamp(pulse)) * .53;
     particles.visible = time < 1;
-    beam.visible = jumping?.golden && time < 1.2;
-    streaks.visible = jumping?.warp && time < .69;
     if (particles.visible) {
       const t = clamp(time);
       particleMaterial.opacity = (1 - t) * (jumping.golden ? .76 : .47);
@@ -597,20 +585,6 @@ function createView(T, stage) {
         particleData.set([actorTo.x + Math.cos(theta) * radial, actorTo.y + .23 + t * (1.2 + hash(i, 306) * 4) - t * t * 2.55, actorTo.z + Math.sin(theta) * radial], i * 3);
       }
       particlesShape.attributes.position.needsUpdate = true;
-    }
-    if (beam.visible) {
-      beam.position.set(actorTo.x, actorTo.y + 8, actorTo.z);
-      beamMaterial.opacity = Math.sin(clamp(time / 1.2) * Math.PI) * .32;
-    }
-    if (streaks.visible) {
-      const t = time / .69;
-      warpMaterial.opacity = Math.sin(t * Math.PI) * .63;
-      for (let i = 0; i < warpData.length / 6; i++) {
-        const x = (hash(i, 45) - .5) * 31, z = -4 - hash(i, 49) * 17;
-        const y = followed * spacing + (hash(i, 47) - .5) * 17 - t * 9;
-        warpData.set([x, y, z, x + .25, y + 1.7 + hash(i, 85) * 4.9, z], i * 6);
-      }
-      warpShape.attributes.position.needsUpdate = true;
     }
     if (jumping && time > 1.26) jumping = undefined;
   }
@@ -654,7 +628,7 @@ function createView(T, stage) {
     }
     if (!reduced.matches) paintEffects();
     else {
-      ring.visible = particles.visible = beam.visible = streaks.visible = false;
+      ring.visible = particles.visible = false;
     }
     updateScenery(followed);
     for (const [index, dust] of stars.entries()) {
@@ -768,7 +742,7 @@ function createView(T, stage) {
       goldenSet = new Set(golden);
       if (animate && !reduced.matches) {
         const goldenStep = goldenSet.has(total);
-        jumping = { at: elapsed, golden: goldenStep, warp };
+        jumping = { at: elapsed, golden: goldenStep };
         if (goldenStep) {
           stage.animate([{ boxShadow: 'inset 0 0 0 transparent' }, { boxShadow: 'inset 0 0 50px #ffae5970' }, { boxShadow: 'inset 0 0 0 transparent' }], { duration: 750 });
         }
@@ -1066,7 +1040,8 @@ function createCanvasFallback(stage) {
       const sy = fract(y + phase * .019 * Math.sin(time * .3)) * height;
       ctx.fillStyle = light > .93 ? '#f3c4d7' : palette[3];
       ctx.globalAlpha = (.16 + light * .56) * twinkle;
-      ctx.fillRect(sx, sy, light > .88 ? 1.65 : 1, (light > .88 ? 1.65 : 1) + warp * phase * 25);
+      const size = light > .88 ? 1.65 : 1;
+      ctx.fillRect(sx, sy, size, size);
     }
     ctx.globalAlpha = 1 - warp * .80;
     drawScenery(zone, center, unit);
@@ -1092,7 +1067,6 @@ function createCanvasFallback(stage) {
     if (change && age < .85) {
       ctx.globalAlpha = (1 - age / .85) * .7;
       ctx.fillStyle = change.golden ? '#ffd082' : palette[3];
-      if (change.golden) ctx.fillRect(toX - 1, 0, 2, toY);
       for (let i = 0; i < 17; i++) {
         const spread = age * (15 + hash(i, 100) * unit * .85);
         const direction = hash(i, 101) * 6.28;

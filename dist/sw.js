@@ -1,5 +1,5 @@
 const PREFIX = 'little-step-shell-';
-const CACHE = PREFIX + 'v19';
+const CACHE = PREFIX + 'v20';
 const root = self.registration.scope;
 const threeUrl = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.1/three.module.min.js';
 const shell = [
