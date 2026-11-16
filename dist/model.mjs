@@ -109,6 +109,17 @@ export function zoneIndex(sessions) {
   return Math.min(zones.length - 1, Math.floor(Math.max(0, sessions) / stepsPerZone));
 }
 
+export function flightTrailSteps(sessions) {
+  return sessions > 0 ? (sessions - 1) % stepsPerZone + 1 : 0;
+}
+
+export function skyPhase(hour) {
+  if (hour < 5 || hour >= 21) return 'night';
+  if (hour < 12) return 'morning';
+  if (hour < 17) return 'day';
+  return 'evening';
+}
+
 export function nextDestination(sessions) {
   const next = zoneIndex(sessions) + 1;
   if (next >= zones.length) return null;
@@ -205,4 +216,8 @@ export function mastery(logs, id) {
 
 export function remaining(timer, now = Date.now()) {
   return timer.endsAt === null ? timer.remainingMs : Math.max(0, timer.endsAt - now);
+}
+
+export function timerProgress(timer, now = Date.now()) {
+  return Math.min(1, Math.max(0, 1 - remaining(timer, now) / (timer.minutes * 60000)));
 }

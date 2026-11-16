@@ -1,5 +1,5 @@
 import { mount as mountLadder } from './cosmicLadder.js';
-import { TARGET_SESSIONS, dayKey, shiftDay, weekDays, scheduled, entry, logSession, removeLog, deleteHabit, nextTarget, dayCompletion, mastery, remaining, mergeBackup, normalizeGoldenSteps, stepsPerZone, zoneIndex, zones, nextDestination, checkInDays, canEditCheckIn, normalizeWeeklyGoal, weeklyGoalProgress } from './model.mjs';
+import { TARGET_SESSIONS, dayKey, shiftDay, weekDays, scheduled, entry, logSession, removeLog, deleteHabit, nextTarget, dayCompletion, mastery, remaining, mergeBackup, normalizeGoldenSteps, stepsPerZone, zoneIndex, zones, nextDestination, checkInDays, canEditCheckIn, normalizeWeeklyGoal, weeklyGoalProgress, flightTrailSteps, skyPhase, timerProgress } from './model.mjs';
 
 const icons = {
   today: '<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M16 3v4M8 3v4M3 10h18"/><path d="m9 15 2 2 4-4"/>',
@@ -207,6 +207,10 @@ function ladderCard() {
         </svg>
       </span>
     </button>
+    <svg class="flight-trail" viewBox="0 0 180 70" preserveAspectRatio="none" aria-hidden="true">
+      <path class="flight-trail-guide" pathLength="100" d="M6 62C59 60 103 53 141 24Q152 15 158 5"/>
+      <path class="flight-trail-live" pathLength="100" d="M6 62C59 60 103 53 141 24Q152 15 158 5"/>
+    </svg>
     <div class="ladder-copy">
       <h2 id="ladder-title">Cosmic Flight</h2>
       <p class="ladder-zone" data-ladder-label="zone"></p>
@@ -243,7 +247,7 @@ function row(habit, manage = false) {
   const editable = route === 'today' && canEditCheckIn(selected, today);
   const category = categories[habit.category] ? habit.category : 'other';
   const running = state.timer?.id === habit.id;
-  return `<li class="habit-row ${logged && !manage ? 'is-done' : ''}">
+  return `<li class="habit-row ${logged && !manage ? 'is-done' : ''}" data-habit-row="${habit.id}">
     <span class="habit-icon ${category}">${icon(category, 21)}</span>
     <div class="habit-copy"><strong>${safe(habit.name)}</strong><span>${manage ? `${habit.minutes} min daily${habit.step ? ' · Gradual increase' : ''}` : logged ? `${logged.minutes} min · Completed` : `${habit.minutes} min · Daily`}</span>${skillLabel(habit, manage)}</div>
     ${manage
@@ -330,6 +334,7 @@ function progressScreen() {
 }
 
 function render({ resetScroll = false } = {}) {
+  const previousRoute = screen.dataset.route;
   const existingLadder = screen.querySelector('.ladder-card');
   if (route !== 'today' && ladder) {
     ladder.destroy();
@@ -352,6 +357,10 @@ function render({ resetScroll = false } = {}) {
     else slot.outerHTML = ladderCard();
     const card = screen.querySelector('.ladder-card');
     const charge = chargeFor(selected);
+    const trailSteps = flightTrailSteps(state.logs.length);
+    const trail = card.querySelector('.flight-trail');
+    trail.style.setProperty('--trail-fill', String(trailSteps / stepsPerZone * 100));
+    trail.classList.toggle('is-lit', trailSteps > 0);
     const destination = nextDestination(state.logs.length);
     const next = card.querySelector('[data-ladder-next]');
     next.hidden = !destination;
@@ -362,6 +371,19 @@ function render({ resetScroll = false } = {}) {
   }
   if (scrollAt && screen.querySelector('.habit-list')) screen.querySelector('.habit-list').scrollTop = scrollAt;
   if (resetScroll) screen.scrollTop = 0;
+  updateActiveHabit();
+  if (previousRoute !== route && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const easing = 'cubic-bezier(.22,.7,.25,1)';
+    if (previousRoute) {
+      const direction = Object.keys(routes).indexOf(route) > Object.keys(routes).indexOf(previousRoute) ? 1 : -1;
+      screen.animate([{ opacity: .55, transform: 'translateX(' + direction * 11 + 'px)' }, { opacity: 1, transform: 'translateX(0)' }],
+        { duration: 205, easing });
+    } else {
+      const cards = screen.querySelectorAll('.ladder-card,.habit-section,.week-report,.totals,.weekly-goal,.collection');
+      cards.forEach((card, index) => card.animate([{ opacity: .4, transform: 'translateY(8px)' }, { opacity: 1, transform: 'translateY(0)' }],
+        { duration: 290, delay: index * 35, easing, fill: 'backwards' }));
+    }
+  }
 }
 
 function openSheet(title, description, content, kind = '') {
@@ -471,7 +493,20 @@ function timerSheet(habit) {
   updateTimer(true);
 }
 
+function updateActiveHabit() {
+  const timer = state.timer;
+  if (!timer || route !== 'today' || selected !== today) return;
+  const row = screen.querySelector(`[data-habit-row="${timer.id}"]`);
+  const ring = row?.querySelector('.check-button:not(.checked)');
+  if (!ring) return;
+  const now = Date.now();
+  const turn = timerProgress(timer, now).toFixed(3) + 'turn';
+  if (ring.style.getPropertyValue('--habit-turn') !== turn) ring.style.setProperty('--habit-turn', turn);
+  row.classList.toggle('is-timing', timer.endsAt !== null && remaining(timer, now) > 0);
+}
+
 function updateTimer(force = false) {
+  updateActiveHabit();
   if (!sheet.open || sheet.dataset.kind !== 'timer') return;
   const panel = sheet.querySelector('#timer-panel');
   const habit = state.habits.find((item) => item.id === sheet.dataset.habit);
@@ -590,7 +625,10 @@ async function importData(input) {
 }
 
 function syncDay() {
-  const current = dayKey();
+  const now = new Date();
+  const phase = skyPhase(now.getHours());
+  if (document.documentElement.dataset.skyTime !== phase) document.documentElement.dataset.skyTime = phase;
+  const current = dayKey(now);
   if (current === today) return;
   if (selected === today) selected = current;
   if (progressWeek === today) progressWeek = current;
@@ -872,5 +910,6 @@ if ('serviceWorker' in navigator) {
 }
 
 for (const target of document.querySelectorAll('[data-icon]')) target.innerHTML = icon(target.dataset.icon);
+syncDay();
 render();
 if (!storageAvailable) say('Browser storage is unavailable. Changes may be lost on reload.');
