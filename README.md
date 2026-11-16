@@ -15,7 +15,8 @@ The site is deployed automatically from the `dist/` directory through `.github/w
 - Touch- and keyboard-interactive Cosmic Flight with a zone every eight lifetime sessions and occasional golden steps
 - Theme-wide **Amethyst**, **Lagoon**, **Dusk**, and **Orbit** palettes with animated atmospheres that respond to today's progress
 - Matching SVG controls, accessible dropdowns, themed seven-day multiselect, responsive mobile navigation
-- Session history and progress charts; archived and paused habits
+- Session history and progress charts, calendar check-ins for yesterday, and archived or paused habits
+- Next-destination countdown and an optional weekly goal that counts distinct check-in days
 - Installable offline-ready PWA with the approved 1024px Rising Steps logo and optimized device icons
 - Local browser storage and JSON backup export/import with golden steps
 

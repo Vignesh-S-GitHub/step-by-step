@@ -177,7 +177,17 @@ h1{font-size:40px;line-height:1.08;font-weight:740;letter-spacing:-.035em}
 .archived{margin-top:12px;color:var(--muted)}
 .archived summary{min-height:44px;padding:12px 5px;cursor:pointer}
 .progress-grid{display:grid;grid-template-columns:1.04fr 1fr;gap:14px}
-.week-report,.collection,.totals{padding:13px 15px;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface)}
+.week-report,.collection,.totals,.weekly-goal{padding:13px 15px;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface)}
+.weekly-goal{grid-column:1/-1;display:flex;align-items:center;gap:12px;min-height:65px}
+.goal-copy{flex:1;min-width:0}
+.goal-copy h2{font-size:16px;line-height:1.2}
+.goal-copy p{margin-top:3px;color:var(--muted);font-size:12px}
+.weekly-goal .small-action{flex:none;white-space:nowrap}
+.goal-ring{display:grid;flex:none;place-items:center;width:43px;aspect-ratio:1;border-radius:50%;background:conic-gradient(var(--accent) var(--goal-turn),var(--raised) 0)}
+.goal-ring span{display:grid;place-items:center;width:35px;aspect-ratio:1;border-radius:50%;background:var(--surface);color:var(--accent);font-size:11px;font-weight:730;font-variant-numeric:tabular-nums}
+.goal-options{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;margin:6px 0 10px}
+.goal-options button{min-height:42px;border:1px solid var(--control-edge);border-radius:8px;background:var(--field);color:var(--ink);font-weight:690}
+.goal-options button[aria-pressed="true"]{background:var(--action);color:var(--on-accent);border-color:var(--accent)}
 .week-report .section-title{margin-bottom:0}
 .week-report p{color:var(--muted);font-size:12px}
 .week-actions{display:flex}
@@ -290,7 +300,7 @@ input::placeholder{color:var(--muted)}
   .dock a[aria-current]{color:var(--accent)}
   .dock a[aria-current] svg{width:45px;padding:2px 10px;border-radius:8px;background:var(--accent-deep)}
   .progress-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:9px}
-  .week-report,.collection,.totals{padding:7px 10px}
+  .week-report,.collection,.totals,.weekly-goal{padding:7px 10px}
   .week-report .icon-button{height:35px}
   .chart{margin-top:5px}
   .chart-column{grid-template-rows:auto 49px auto}
@@ -336,6 +346,7 @@ input::placeholder{color:var(--muted)}
 .ladder-zone{margin-top:8px;font-size:12px;font-weight:690;color:var(--accent)}
 .ladder-count{display:block;margin:5px 0 3px;font-size:19px;font-weight:760;line-height:1.1;font-variant-numeric:tabular-nums}
 .ladder-charge{font-size:11px;color:var(--muted)}
+.ladder-next{display:flex;align-items:center;gap:5px;margin-top:5px;color:var(--accent);font-size:11px;font-weight:690;line-height:1.2}
 .ladder-route{position:absolute;z-index:3;top:4px;right:5px;color:var(--accent);background:color-mix(in srgb,var(--bg) 72%,transparent)}
 .ladder-guide{position:absolute;z-index:2;bottom:7px;right:8px;display:flex;align-items:center;gap:5px;padding:3px 6px;border-radius:6px;background:color-mix(in srgb,var(--bg) 83%,transparent);color:var(--muted);font-size:10px;pointer-events:none}
 .ladder-stage:not(.ladder-live) ~ .ladder-guide{display:none}
@@ -361,6 +372,7 @@ input::placeholder{color:var(--muted)}
   .ladder-copy h2{font-size:21px}
   .ladder-zone{margin-top:6px;font-size:11px}
   .ladder-count{font-size:17px}
+  .ladder-next{font-size:10px}
   .ladder-route{top:2px;right:3px}
   .ladder-guide{bottom:5px;right:5px;font-size:9px}
 }

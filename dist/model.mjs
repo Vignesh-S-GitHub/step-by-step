@@ -20,6 +20,28 @@ export function weekDays(day) {
   return Array.from({ length: 7 }, (_, i) => shiftDay(day, i - offset));
 }
 
+export function checkInDays(today) {
+  const days = weekDays(today);
+  const yesterday = shiftDay(today, -1);
+  return days[0] === today ? [yesterday, ...days.slice(0, -1)] : days;
+}
+
+export function canEditCheckIn(day, today) {
+  return day === today || day === shiftDay(today, -1);
+}
+
+export function normalizeWeeklyGoal(goal) {
+  return Number.isInteger(goal) && goal >= 1 && goal <= 7 ? goal : null;
+}
+
+export function weeklyGoalProgress(logs, today, goal) {
+  const target = normalizeWeeklyGoal(goal);
+  if (target === null) return null;
+  const [monday] = weekDays(today);
+  const days = new Set(logs.filter(({ day }) => day >= monday && day <= today).map(({ day }) => day));
+  return { days: days.size, target };
+}
+
 export function scheduled(habits, day) {
   return habits.filter((habit) =>
     day >= habit.created && (!habit.archived || day < habit.archived) &&
@@ -87,6 +109,12 @@ export function zoneIndex(sessions) {
   return Math.min(zones.length - 1, Math.floor(Math.max(0, sessions) / stepsPerZone));
 }
 
+export function nextDestination(sessions) {
+  const next = zoneIndex(sessions) + 1;
+  if (next >= zones.length) return null;
+  return { name: zones[next].name || 'Beyond', remaining: next * stepsPerZone - sessions };
+}
+
 export function normalizeGoldenSteps(steps, total) {
   if (!Array.isArray(steps)) return [];
   return [...new Set(steps.filter((step) => Number.isInteger(step) && step > 0 && step <= total))].sort((a, b) => a - b);
@@ -146,7 +174,10 @@ export function mergeBackup(state, backup) {
     }
     if (importedGold.has(index + 1)) golden.add(indices.get(key));
   });
-  return { ...state, habits: [...habits.values()], logs, goldenSteps: [...golden].sort((a, b) => a - b) };
+  const result = { ...state, habits: [...habits.values()], logs, goldenSteps: [...golden].sort((a, b) => a - b) };
+  const goal = normalizeWeeklyGoal(backup.weeklyGoal);
+  if (state.weeklyGoal === undefined && goal !== null) result.weeklyGoal = goal;
+  return result;
 }
 
 export function nextTarget(state, habit) {

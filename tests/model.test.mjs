@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { dayKey, scheduled, logSession, removeLog, deleteHabit, entry, nextTarget, dayCompletion, remaining, weekDays, mergeBackup, zoneIndex, zones } from '../dist/model.mjs';
+import { dayKey, scheduled, logSession, removeLog, deleteHabit, entry, nextTarget, dayCompletion, remaining, weekDays, mergeBackup, zoneIndex, zones, nextDestination, canEditCheckIn, checkInDays, weeklyGoalProgress } from '../dist/model.mjs';
 
 test('date helpers give predictable local dates', () => {
   assert.equal(dayKey(new Date(2026, 10, 15, 12)), '2026-11-15');
@@ -93,4 +93,41 @@ test('zones unlock at eight-session intervals and debug preview stays separate',
   assert.deepEqual([0, 7, 8, 39, 40, 63, 64, 30000].map(zoneIndex), [0, 0, 1, 4, 5, 7, 8, 8]);
   assert.equal(zones[4].name, 'The Moon');
   assert.equal(zones[8].name, '');
+});
+
+test('next destination uses remaining steps and ends at Beyond', () => {
+  assert.deepEqual(nextDestination(0), { name: 'Sky', remaining: 8 });
+  assert.deepEqual(nextDestination(7), { name: 'Sky', remaining: 1 });
+  assert.deepEqual(nextDestination(8), { name: 'Atmosphere edge', remaining: 8 });
+  assert.deepEqual(nextDestination(63), { name: 'Beyond', remaining: 1 });
+  assert.equal(nextDestination(64), null);
+});
+
+test('yesterday is editable across Monday and year boundaries', () => {
+  for (const [today, yesterday] of [['2026-11-16', '2026-11-15'], ['2027-01-01', '2026-12-31']]) {
+    assert.ok(checkInDays(today).includes(yesterday));
+    assert.ok(checkInDays(today).includes(today));
+    assert.equal(checkInDays(today).length, 7);
+    assert.ok(canEditCheckIn(yesterday, today));
+    assert.ok(canEditCheckIn(today, today));
+  }
+  assert.equal(canEditCheckIn('2026-11-14', '2026-11-16'), false);
+  assert.equal(canEditCheckIn('2026-11-17', '2026-11-16'), false);
+});
+
+test('weekly goal counts distinct days, resets Monday, and skips future records', () => {
+  const logs = ['2026-11-15', '2026-11-16', '2026-11-16', '2026-11-17', '2026-11-23'].map(day => ({ day }));
+  assert.deepEqual(weeklyGoalProgress(logs, '2026-11-16', 4), { days: 1, target: 4 });
+  assert.deepEqual(weeklyGoalProgress(logs, '2026-11-17', 4), { days: 2, target: 4 });
+  assert.equal(weeklyGoalProgress(logs, '2026-11-17', null), null);
+  assert.equal(weeklyGoalProgress(logs, '2026-11-17', 8), null);
+});
+
+test('backup restores an optional weekly goal and keeps an existing preference', () => {
+  const backup = { habits: [], logs: [], weeklyGoal: 4 };
+  const state = { habits: [], logs: [], goldenSteps: [] };
+  assert.equal(mergeBackup(state, backup).weeklyGoal, 4);
+  assert.equal(mergeBackup({ ...state, weeklyGoal: 3 }, backup).weeklyGoal, 3);
+  assert.equal(mergeBackup({ ...state, weeklyGoal: null }, backup).weeklyGoal, null);
+  assert.equal(mergeBackup(state, { ...backup, weeklyGoal: 8 }).weeklyGoal, undefined);
 });

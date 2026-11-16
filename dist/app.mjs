@@ -1,5 +1,5 @@
 import { mount as mountLadder } from './cosmicLadder.js';
-import { TARGET_SESSIONS, dayKey, shiftDay, weekDays, scheduled, entry, logSession, removeLog, deleteHabit, nextTarget, dayCompletion, mastery, remaining, mergeBackup, normalizeGoldenSteps, stepsPerZone, zoneIndex, zones } from './model.mjs';
+import { TARGET_SESSIONS, dayKey, shiftDay, weekDays, scheduled, entry, logSession, removeLog, deleteHabit, nextTarget, dayCompletion, mastery, remaining, mergeBackup, normalizeGoldenSteps, stepsPerZone, zoneIndex, zones, nextDestination, checkInDays, canEditCheckIn, normalizeWeeklyGoal, weeklyGoalProgress } from './model.mjs';
 
 const icons = {
   today: '<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M16 3v4M8 3v4M3 10h18"/><path d="m9 15 2 2 4-4"/>',
@@ -26,6 +26,7 @@ const icons = {
   lock: '<rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',
   settings: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3M5 5l2 2m10 10 2 2M5 19l2-2M17 7l2-2"/><circle cx="12" cy="12" r="8"/>',
   rotate: '<path d="M3 13a9 9 0 1 0 3.5-8M3 5v8h8"/>',
+  planet: '<circle cx="12" cy="12" r="6"/><path d="M16 8c2.6-.7 4.5-.5 5 .4 1 1.8-2.5 5.3-7.6 7.9s-10 3.2-10.9 1.4c-.5-1 .6-2.6 2.6-4.2"/>',
   spark: '<path d="m12 2 2.5 7.5L22 12l-7.5 2.5L12 22l-2.5-7.5L2 12l7.5-2.5L12 2Z"/>',
   install: '<path d="M12 3v12m-4-4 4 4 4-4M4 16v5h16v-5"/>',
 };
@@ -174,12 +175,15 @@ function navigation() {
 }
 
 function dateStrip() {
-  return `<div class="week-strip" aria-label="This week">${weekDays(today).map((day, i) => {
+  const days = checkInDays(today);
+  const yesterday = shiftDay(today, -1);
+  return `<div class="week-strip" aria-label="Check-in calendar">${days.map((day) => {
     const possible = scheduled(state.habits, day).length;
     const completed = state.logs.filter((log) => log.day === day).length;
     const fullDate = dateLabel(day, { weekday: 'long', month: 'long', day: 'numeric' });
-    return `<button class="day ${day === today ? 'day-today' : ''}" data-action="date" data-date="${day}" ${day > today ? 'disabled' : ''} aria-pressed="${day === selected}" aria-label="${fullDate}${day === today ? ', today' : ''}${completed ? ', ' + countLabel(completed, 'session') : ''}">
-      <span>${weekdays[i]}</span><strong>${day.slice(-2).replace(/^0/, '')}</strong><i class="${completed ? possible && completed >= possible ? 'full' : 'partial' : ''}"></i>
+    const relative = day === today ? ', today' : day === yesterday ? ', yesterday' : '';
+    return `<button class="day ${day === today ? 'day-today' : ''}" data-action="date" data-date="${day}" ${day > today ? 'disabled' : ''} aria-pressed="${day === selected}" aria-label="${fullDate}${relative}${completed ? ', ' + countLabel(completed, 'session') : ''}">
+      <span>${dateLabel(day, { weekday: 'narrow' })}</span><strong>${day.slice(-2).replace(/^0/, '')}</strong><i class="${completed ? possible && completed >= possible ? 'full' : 'partial' : ''}"></i>
     </button>`;
   }).join('')}</div>`;
 }
@@ -208,6 +212,7 @@ function ladderCard() {
       <p class="ladder-zone" data-ladder-label="zone"></p>
       <strong class="ladder-count" data-ladder-label="count"></strong>
       <p class="ladder-charge" data-ladder-charge></p>
+      <p class="ladder-next" data-ladder-next hidden>${icon('planet', 13)} <span></span></p>
     </div>
     <button class="icon-button ladder-route" data-action="ladder-info" aria-label="Cosmic Flight journey">${icon('spark', 18)}</button>
     <span class="ladder-guide" id="ladder-controls">${icon('rotate', 13)} Drag to rotate</span>
@@ -235,7 +240,7 @@ function skillLabel(habit, manage) {
 
 function row(habit, manage = false) {
   const logged = entry(state, habit.id, selected);
-  const activeDay = selected === today && route === 'today';
+  const editable = route === 'today' && canEditCheckIn(selected, today);
   const category = categories[habit.category] ? habit.category : 'other';
   const running = state.timer?.id === habit.id;
   return `<li class="habit-row ${logged && !manage ? 'is-done' : ''}">
@@ -243,8 +248,8 @@ function row(habit, manage = false) {
     <div class="habit-copy"><strong>${safe(habit.name)}</strong><span>${manage ? `${habit.minutes} min daily${habit.step ? ' · Gradual increase' : ''}` : logged ? `${logged.minutes} min · Completed` : `${habit.minutes} min · Daily`}</span>${skillLabel(habit, manage)}</div>
     ${manage
       ? `<button class="icon-button" data-action="edit" data-id="${habit.id}" aria-label="Edit ${safe(habit.name)}">${icon('chevron', 20)}</button>`
-      : activeDay
-        ? `<div class="row-actions">${logged ? '' : `<button class="icon-button timer-button ${running ? 'running' : ''}" data-action="timer" data-id="${habit.id}" aria-label="${running ? 'Open active timer for' : 'Timer for'} ${safe(habit.name)}">${icon('timer', 21)}</button>`}<button class="check-button ${logged ? 'checked' : ''}" data-action="toggle" data-id="${habit.id}" aria-label="${logged ? 'Undo' : 'Complete'} ${safe(habit.name)}" aria-pressed="${Boolean(logged)}">${icon('check', 18)}</button></div>`
+      : editable
+        ? `<div class="row-actions">${logged || selected !== today ? '' : `<button class="icon-button timer-button ${running ? 'running' : ''}" data-action="timer" data-id="${habit.id}" aria-label="${running ? 'Open active timer for' : 'Timer for'} ${safe(habit.name)}">${icon('timer', 21)}</button>`}<button class="check-button ${logged ? 'checked' : ''}" data-action="toggle" data-id="${habit.id}" data-check-in-day="${selected}" aria-label="${logged ? 'Undo' : 'Complete'} ${safe(habit.name)}${selected !== today ? ' for yesterday' : ''}" aria-pressed="${Boolean(logged)}">${icon('check', 18)}</button></div>`
         : `<span class="past-state">${logged ? icon('check', 18) : '—'}</span>`}
   </li>`;
 }
@@ -256,9 +261,10 @@ function todayScreen() {
   const suggestion = selected === today && habits.find((habit) => nextTarget(state, habit));
   const allDone = habits.length > 0 && habits.every((habit) => entry(state, habit.id, selected));
   const currentCount = selected === today ? habits.filter((habit) => entry(state, habit.id, selected)).length : completed;
+  const title = selected === today ? 'Daily activities' : selected === shiftDay(today, -1) ? 'Yesterday’s activities' : 'Activity log';
   return `${dateStrip()}<div data-ladder-slot></div>
     <section class="habit-section" aria-labelledby="activity-title">
-      <div class="section-title"><h2 id="activity-title">${selected === today ? 'Daily activities' : 'Activity log'}</h2><span class="completion ${allDone ? 'all-done' : ''}">${allDone ? icon('check', 15) : ''}${currentCount} / ${visible.length} done</span></div>
+      <div class="section-title"><h2 id="activity-title">${title}</h2><span class="completion ${allDone ? 'all-done' : ''}">${allDone ? icon('check', 15) : ''}${currentCount} / ${visible.length} done</span></div>
       ${suggestion ? `<button class="suggestion" data-action="raise" data-id="${suggestion.id}">${icon('up', 16)}<span><strong>${safe(suggestion.name)}</strong> is ready for ${nextTarget(state, suggestion)} min</span>${icon('chevron', 17)}</button>` : ''}
       ${visible.length ? `<ul class="habit-list">${visible.map((habit) => row(habit)).join('')}</ul>` : `<div class="empty"><p>${selected === today ? 'Make room for one small habit.' : 'No activities scheduled for this day.'}</p>${selected === today ? '<button class="small-action" data-action="add">Add a habit</button>' : ''}</div>`}
     </section>`;
@@ -271,6 +277,33 @@ function habitsScreen() {
     ${habits.length ? `<ul class="habit-list">${habits.map((habit) => row(habit, true)).join('')}</ul>` : '<div class="empty"><p>Start with one activity you can do in five minutes.</p><button class="small-action" data-action="add">Add a habit</button></div>'}
     ${archived.length ? `<details class="archived"><summary>Archived habits (${archived.length})</summary><ul class="habit-list">${archived.map((habit) => `<li class="habit-row"><div class="habit-copy"><strong>${safe(habit.name)}</strong></div><button class="small-action" data-action="restore" data-id="${habit.id}">Restore</button><button class="icon-button danger" data-action="delete-habit" data-id="${habit.id}" aria-label="Delete ${safe(habit.name)}">${icon('trash', 19)}</button></li>`).join('')}</ul></details>` : ''}
   </section>`;
+}
+
+function weeklyGoalCard() {
+  const progress = weeklyGoalProgress(state.logs, today, state.weeklyGoal);
+  const met = progress && progress.days >= progress.target;
+  const detail = progress
+    ? (met ? `${countLabel(progress.days, 'day')} · Goal reached` : `${progress.days} of ${progress.target} days this week`)
+    : 'Pick how many days you want to show up.';
+  return `<section class="weekly-goal" aria-labelledby="weekly-goal-title">
+    ${progress ? `<div class="goal-ring" role="progressbar" aria-label="Days logged this week"
+      aria-valuemax="${progress.target}" aria-valuenow="${Math.min(progress.days, progress.target)}"
+      aria-valuetext="${progress.days} days logged, goal ${progress.target}" style="--goal-turn:${Math.min(1, progress.days / progress.target)}turn">
+      <span aria-hidden="true">${met ? icon('check', 19) : `${progress.days}/${progress.target}`}</span>
+    </div>` : ''}
+    <div class="goal-copy"><h2 id="weekly-goal-title">Weekly goal</h2><p>${detail}</p></div>
+    <button class="small-action" data-action="weekly-goal">${progress ? 'Edit goal' : 'Set goal'}</button>
+  </section>`;
+}
+
+function weeklyGoalSheet() {
+  const current = normalizeWeeklyGoal(state.weeklyGoal);
+  openSheet('Weekly goal', 'Choose how many days to check in. Each day with a completed habit counts once.',
+    `<div class="goal-options" role="group" aria-label="Days per week">${weekdays.map((_, index) => {
+      const days = index + 1;
+      return `<button type="button" data-action="set-weekly-goal" data-days="${days}" aria-label="${countLabel(days, 'day')} per week" aria-pressed="${days === current}">${days}</button>`;
+    }).join('')}</div>
+    ${current ? '<button class="subtle full-button" data-action="set-weekly-goal" data-days="off">Turn off weekly goal</button>' : ''}`);
 }
 
 function progressScreen() {
@@ -291,6 +324,7 @@ function progressScreen() {
       <div class="chart" aria-label="Sessions completed each day">${weeklyCounts.map((count, i) => `<div class="chart-column" aria-label="${dateLabel(days[i], { weekday: 'long' })}, ${countLabel(count, 'session')}"><span class="bar-count">${count || '–'}</span><span class="bar-track"><i style="--height:${count / max}"></i></span><span>${weekdays[i]}</span></div>`).join('')}</div>
     </section>
     <section class="totals" aria-label="All-time activity"><div><strong>${total}</strong><span>Sessions</span></div><div><strong>${minutes}</strong><span>Minutes</span></div><div><strong>${state.goldenSteps.length}</strong><span>Golden steps</span></div></section>
+    ${weeklyGoalCard()}
     <section class="collection" aria-labelledby="journey-title"><div class="section-title"><h2 id="journey-title">Cosmic Flight</h2>${zone.name ? `<span class="completion">${zone.name}</span>` : ''}</div>${journey()}</section>
   </div>`;
 }
@@ -318,6 +352,10 @@ function render({ resetScroll = false } = {}) {
     else slot.outerHTML = ladderCard();
     const card = screen.querySelector('.ladder-card');
     const charge = chargeFor(selected);
+    const destination = nextDestination(state.logs.length);
+    const next = card.querySelector('[data-ladder-next]');
+    next.hidden = !destination;
+    if (destination) next.querySelector('span').textContent = countLabel(destination.remaining, 'step') + ' to ' + destination.name;
     card.querySelector('[data-ladder-charge]').textContent = (selected === today ? 'Today' : 'Selected day') + ' · ' + charge.done + ' / ' + charge.total + ' sessions';
     ladder ??= mountLadder(card);
     ladder.setProgress(state.logs.length, state.goldenSteps);
@@ -454,22 +492,22 @@ function updateTimer(force = false) {
   if (output.textContent !== time) output.textContent = time;
 }
 
-function complete(habit, fromTimer = false) {
-  if (!scheduled([habit], today).length) return;
+function complete(habit, { fromTimer = false, day = today } = {}) {
+  if (!habit || !canEditCheckIn(day, today) || !scheduled([habit], day).length) return;
   const beforeSkill = mastery(state.logs, habit.id).level;
   const minutes = fromTimer ? state.timer.minutes : habit.minutes;
   const golden = Math.random() < 1 / 6;
   const candidate = { ...state, logs: [...state.logs], goldenSteps: [...state.goldenSteps] };
-  if (!logSession(candidate, habit.id, today, minutes, golden)) return;
-  if (candidate.timer?.id === habit.id) candidate.timer = null;
+  if (!logSession(candidate, habit.id, day, minutes, golden)) return;
+  if (day === today && candidate.timer?.id === habit.id) candidate.timer = null;
   if (!save(candidate)) return;
   state = candidate;
-  undoLog = { id: habit.id, day: today };
+  undoLog = { id: habit.id, day };
   if (sheet.open) sheet.close();
   ladder?.addStep(golden);
   render();
   const afterSkill = mastery(state.logs, habit.id).level;
-  let message = golden ? 'Golden step added!' : 'Session logged. Flight advanced.';
+  let message = golden ? 'Golden step added!' : day === today ? 'Session logged. Flight advanced.' : 'Yesterday’s session logged.';
   if (afterSkill > beforeSkill) message += ` · Skill level ${afterSkill}`;
   say(message, true);
   screen.querySelector(`[data-action="toggle"][data-id="${habit.id}"]`)?.focus({ preventScroll: true });
@@ -517,7 +555,7 @@ async function installApp() {
 }
 
 function exportData() {
-  const url = URL.createObjectURL(new Blob([JSON.stringify({ habits: state.habits, logs: state.logs, goldenSteps: state.goldenSteps }, null, 2)], { type: 'application/json' }));
+  const url = URL.createObjectURL(new Blob([JSON.stringify({ habits: state.habits, logs: state.logs, goldenSteps: state.goldenSteps, weeklyGoal: state.weeklyGoal }, null, 2)], { type: 'application/json' }));
   const link = document.createElement('a');
   link.href = url;
   link.download = `step-by-step-${today}.json`;
@@ -673,16 +711,19 @@ document.addEventListener('click', (event) => {
       render();
       break;
     case 'timer-log':
-      if (state.timer?.id === id && !remaining(state.timer)) complete(habit, true);
+      if (state.timer?.id === id && !remaining(state.timer)) complete(habit, { fromTimer: true });
       break;
-    case 'toggle':
-      if (entry(state, id, today)) {
-        if (!removeCompletion(id, today)) return;
+    case 'toggle': {
+      const day = trigger.dataset.checkInDay;
+      if (!habit || day !== selected || !canEditCheckIn(day, today)) return;
+      if (entry(state, id, day)) {
+        if (!removeCompletion(id, day)) return;
         screen.querySelector(`[data-action="toggle"][data-id="${id}"]`)?.focus({ preventScroll: true });
       } else {
-        complete(habit);
+        complete(habit, { day });
       }
       break;
+    }
     case 'undo':
       if (undoLog) removeCompletion(undoLog.id, undoLog.day);
       break;
@@ -764,6 +805,19 @@ document.addEventListener('click', (event) => {
       save();
       render();
       say('Habit restored.');
+      break;
+    }
+    case 'weekly-goal': weeklyGoalSheet(); break;
+    case 'set-weekly-goal': {
+      const days = normalizeWeeklyGoal(Number(trigger.dataset.days));
+      if (days === null && trigger.dataset.days !== 'off') return;
+      const next = { ...state, weeklyGoal: days };
+      if (!save(next)) return;
+      state = next;
+      sheet.close();
+      render();
+      screen.querySelector('[data-action="weekly-goal"]')?.focus({ preventScroll: true });
+      say(days === null ? 'Weekly goal turned off.' : 'Weekly goal set to ' + countLabel(days, 'day') + '.');
       break;
     }
     case 'ladder-info': ladderInfo(); break;
