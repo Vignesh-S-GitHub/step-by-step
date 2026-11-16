@@ -2,6 +2,7 @@ import { normalizeGoldenSteps, stepsPerZone, zoneIndex, zones, moveRocket } from
 
 const threeUrl = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.1/three.module.min.js';
 const spacing = .49;
+const sceneryMotion = .65;
 const palettes = {
   amethyst: ['#130825', '#582183', '#c47aff', '#edc7ff'],
   lagoon: ['#051b26', '#18606e', '#5dded6', '#cff9f0'],
@@ -103,14 +104,13 @@ function previewZone() {
 }
 
 // Both renderers share touch, mouse and keyboard handling and the same movement bounds.
-function bindFlightControls(stage, options, { draw, turn, hitRocket, pulse, center }) {
+function bindFlightControls(stage, options, { draw, hitRocket, pulse, center }) {
   let drag;
   let position = { x: 0, y: 0 };
 
   function move(dx, dy) {
     const { width, height } = stage.getBoundingClientRect();
     position = moveRocket(position, dx, dy, width, height);
-    turn(dx, dy);
     draw();
   }
 
@@ -509,8 +509,10 @@ function createView(T, stage) {
   const paletteColors = scenicSkies.map((color) => new T.Color(color));
   let themeName, frame = 0, last = 0, elapsed = 0, seen = true, lost = false;
   let lastTop, lastHorizon;
+  let viewWidth = 0, viewHeight = 0, projectedDrag;
   let total = 0, followed = 0, goldenSet = new Set(), jumping, pulsing;
-  let angle = .63, targetAngle = angle, tilt = .23, targetTilt = tilt;
+  const tilt = .23;
+  let angle = .63, targetAngle = angle;
 
   const warmPlume = new T.Color(0xff933f);
   const warmFlame = new T.Color(0xffe7a5);
@@ -590,6 +592,15 @@ function createView(T, stage) {
   }
 
   function draw() {
+    if (!viewWidth || !viewHeight) return;
+    const drag = controls.position;
+    const { x, y } = drag;
+    if (drag !== projectedDrag) {
+      // Shift the whole scene in screen space, then move the rocket the remaining distance.
+      const framing = viewWidth < 560 ? .17 : .16;
+      camera.setViewOffset(viewWidth, viewHeight, -viewWidth * (framing + x * sceneryMotion), -viewHeight * y * sceneryMotion, viewWidth, viewHeight);
+      projectedDrag = drag;
+    }
     updateTheme();
     const time = jumping ? elapsed - jumping.at : 2;
     const pulseTime = pulsing === undefined ? 2 : elapsed - pulsing;
@@ -606,10 +617,9 @@ function createView(T, stage) {
     cameraUp.setFromMatrixColumn(camera.matrixWorld, 1);
     const screenHeight = 2 * radius * Math.tan(T.MathUtils.degToRad(camera.fov / 2));
     const screenWidth = screenHeight * camera.aspect;
-    const { x, y } = controls.position;
     actorTo.set(.16, followed * spacing + .37, .20)
-      .addScaledVector(cameraRight, x * screenWidth)
-      .addScaledVector(cameraUp, -y * screenHeight);
+      .addScaledVector(cameraRight, x * screenWidth * (1 - sceneryMotion))
+      .addScaledVector(cameraUp, -y * screenHeight * (1 - sceneryMotion));
     actorPoint.copy(actorTo);
     actorPoint.x += .20 * lift;
     actorPoint.y += bob + lift;
@@ -649,13 +659,13 @@ function createView(T, stage) {
       last = now;
       if (!reduced.matches) {
         elapsed += dt;
-        if (!controls.dragging) targetAngle += dt * .085;
-        angle += (targetAngle - angle) * (1 - Math.exp(-dt * 7));
-        tilt += (targetTilt - tilt) * (1 - Math.exp(-dt * 7));
+        if (!controls.dragging) {
+          targetAngle += dt * .085;
+          angle += (targetAngle - angle) * (1 - Math.exp(-dt * 7));
+        }
         followed += (total - followed) * (1 - Math.exp(-dt * 4.15));
       } else {
         angle = targetAngle;
-        tilt = targetTilt;
         followed = total;
       }
       draw();
@@ -675,9 +685,11 @@ function createView(T, stage) {
 
   const resize = new ResizeObserver(([entry]) => {
     const { width, height } = entry.contentRect;
+    viewWidth = width;
+    viewHeight = height;
+    projectedDrag = undefined;
     if (!width || !height) return;
     renderer.setSize(width, height, false);
-    camera.setViewOffset(width, height, -width * (width < 560 ? .17 : .16), 0, width, height);
     start();
   });
   resize.observe(stage);
@@ -715,10 +727,6 @@ function createView(T, stage) {
   }, options);
   const controls = bindFlightControls(stage, options, {
     draw: start,
-    turn(dx, dy) {
-      targetAngle -= dx * .006;
-      targetTilt = clamp(targetTilt + dy * .002, -.26, .68);
-    },
     hitRocket(event) {
       const rect = stage.getBoundingClientRect();
       scratch.copy(actor.position).project(camera);
@@ -730,10 +738,7 @@ function createView(T, stage) {
       if (!reduced.matches) pulsing = elapsed;
       start();
     },
-    center() {
-      targetAngle = .63;
-      targetTilt = .23;
-    },
+    center() { angle = targetAngle = .63; },
   });
 
   return {
@@ -864,6 +869,8 @@ function createCanvasFallback(stage) {
         ctx.moveTo(x - unit * 1.78, y);
         ctx.bezierCurveTo(x - unit * 1.06, y * (.49 + j * .08), x - unit * .81, y * (.66 + j * .06), x - unit * .35, y * .84);
         ctx.bezierCurveTo(x + unit * .66, y * (.45 + j * .10), x + unit * 1.06, y * .93, x + unit * 1.48, y);
+        ctx.lineTo(x + unit * 1.48, y * 1.12);
+        ctx.lineTo(x - unit * 1.78, y * 1.12);
         ctx.closePath();
         ctx.fill();
       }
@@ -1029,6 +1036,9 @@ function createCanvasFallback(stage) {
     const zone = zoneIndex(count);
     const center = width * (width < 560 ? .72 : .68);
     const unit = Math.min(height, width * .47);
+    const { x: dragX, y: dragY } = controls.position;
+    const sceneryX = dragX * width * sceneryMotion;
+    const sceneryY = dragY * height * sceneryMotion;
     const age = change ? time - change.at : 2;
     const warp = change?.warp ? 1 - smooth(age / .68) : 0;
     stage.style.setProperty('--ladder-top', palette[0]);
@@ -1036,21 +1046,23 @@ function createCanvasFallback(stage) {
     for (const [x, y, light, phase] of dust) {
       const drift = phase * 2.5 * Math.sin(angle);
       const twinkle = reduced.matches ? 1 : .78 + .22 * Math.sin(time * 1.9 + phase * 6.28);
-      const sx = fract(x + drift * .008) * width;
-      const sy = fract(y + phase * .019 * Math.sin(time * .3)) * height;
+      const sx = fract(x + drift * .008 + dragX * sceneryMotion) * width;
+      const sy = fract(y + phase * .019 * Math.sin(time * .3) + dragY * sceneryMotion) * height;
       ctx.fillStyle = light > .93 ? '#f3c4d7' : palette[3];
       ctx.globalAlpha = (.16 + light * .56) * twinkle;
       const size = light > .88 ? 1.65 : 1;
       ctx.fillRect(sx, sy, size, size);
     }
     ctx.globalAlpha = 1 - warp * .80;
+    ctx.save();
+    ctx.translate(sceneryX, sceneryY);
     drawScenery(zone, center, unit);
+    ctx.restore();
     ctx.globalAlpha = 1;
 
     const boost = 1 - smooth(Math.min(age, pulse === undefined ? 2 : time - pulse) / .92);
-    const { x, y } = controls.position;
-    const toX = center + x * width + Math.sin(angle) * unit * .035;
-    const toY = height * (.44 + y);
+    const toX = center + dragX * width + Math.sin(angle) * unit * .035;
+    const toY = height * (.44 + dragY);
     const lift = age < 1 ? Math.sin(Math.PI * smooth(age)) * unit * .18 : 0;
     rocketX = toX + lift * .24;
     rocketY = toY - lift - Math.sin(time * 2.35) * unit * .02;
@@ -1118,7 +1130,6 @@ function createCanvasFallback(stage) {
   reduced.addEventListener('change', () => { if (reduced.matches) { change = undefined; pulse = undefined; } start(); }, options);
   const controls = bindFlightControls(stage, options, {
     draw: start,
-    turn(dx) { angle += dx * .010; },
     hitRocket(event) {
       const rect = stage.getBoundingClientRect();
       return Math.hypot(event.clientX - rect.left - rocketX, event.clientY - rect.top - rocketY) < 40;
