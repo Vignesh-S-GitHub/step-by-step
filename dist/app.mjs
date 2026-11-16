@@ -1,5 +1,5 @@
 import { mount as mountLadder } from './cosmicLadder.js';
-import { TARGET_SESSIONS, dayKey, shiftDay, weekDays, scheduled, entry, logSession, removeLog, deleteHabit, nextTarget, dayCompletion, mastery, remaining, mergeBackup, normalizeGoldenSteps, stepsPerZone, zoneIndex, zones, nextDestination, checkInDays, canEditCheckIn, normalizeWeeklyGoal, weeklyGoalProgress, skyPhase, timerProgress } from './model.mjs';
+import { TARGET_SESSIONS, dayKey, shiftDay, weekDays, scheduled, partitionHabits, entry, logSession, removeLog, deleteHabit, nextTarget, dayCompletion, mastery, remaining, mergeBackup, normalizeGoldenSteps, stepsPerZone, zoneIndex, zones, nextDestination, checkInDays, canEditCheckIn, normalizeWeeklyGoal, weeklyGoalProgress, skyPhase, timerProgress } from './model.mjs';
 
 const icons = {
   today: '<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M16 3v4M8 3v4M3 10h18"/><path d="m9 15 2 2 4-4"/>',
@@ -8,12 +8,12 @@ const icons = {
   plus: '<path d="M12 5v14M5 12h14"/>',
   check: '<path d="m5 12 4 4L19 6"/>',
   timer: '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6m2 4 2-2"/>',
-  movement: '<path d="m3 15 3-1 3-7 4 10 3-6h5"/>',
-  read: '<path d="M12 6c-2-2-6-3-9-2v15c3-1 7 0 9 2 2-2 6-3 9-2V4c-3-1-7 0-9 2Zm0 0v15"/>',
-  calm: '<path d="M4 13c4 1 6 3 8 7 2-4 4-6 8-7 1 5-3 8-8 8S3 18 4 13Z"/><path d="M8 14c0-4 2-7 4-9 2 2 4 5 4 9"/>',
-  learn: '<path d="m2 10 10-5 10 5-10 5-10-5Zm4 2v5c3 3 9 3 12 0v-5"/>',
-  write: '<path d="m14 6 4 4M4 20l4-1L20 7a2.8 2.8 0 0 0-4-4L4 15v5Z"/>',
-  other: '<path d="m12 3 2.6 6.4L21 12l-6.4 2.6L12 21l-2.6-6.4L3 12l6.4-2.6L12 3Z"/>',
+  movement: '<path class="habit-art-fill" d="M5.5 16.5v-5.7l4.4.8 2-4.1 4 5.4 4 1.6a2.4 2.4 0 0 1-1 4.6H8a2.5 2.5 0 0 1-2.5-2.6Z"/><path d="M5.5 16.5v-5.7l4.4.8 2-4.1 4 5.4 4 1.6a2.4 2.4 0 0 1-1 4.6H8a2.5 2.5 0 0 1-2.5-2.6Zm.4-.6h14.8M13 11l-1.3 1.2M3 6h4m-1 2.5h3"/>',
+  read: '<path class="habit-art-fill" d="M12 10c-2.5-2-5.5-2.8-9-2v10.5c3.5-.8 6.5 0 9 2 2.5-2 5.5-2.8 9-2V8c-3.5-.8-6.5 0-9 2Z"/><path d="M12 10c-2.5-2-5.5-2.8-9-2v10.5c3.5-.8 6.5 0 9 2 2.5-2 5.5-2.8 9-2V8c-3.5-.8-6.5 0-9 2Zm0 0v10.5M6.2 12.7l2.5.6m6.6 0 2.5-.6M12 2.5v3.4m-1.7-1.7h3.4"/>',
+  calm: '<path class="habit-art-fill" d="M19.8 15.7A8.4 8.4 0 0 1 8.5 4.2a8.5 8.5 0 1 0 11.3 11.5Z"/><path d="M19.8 15.7A8.4 8.4 0 0 1 8.5 4.2a8.5 8.5 0 1 0 11.3 11.5ZM16 4v5m-2.5-2.5h5m1.5 4h.1"/>',
+  learn: '<path class="habit-art-fill" d="m2.5 12 9.5-4 9.5 4-9.5 4-9.5-4Z"/><path d="m2.5 12 9.5-4 9.5 4-9.5 4-9.5-4Zm4 1.7v4c2.7 2.4 8.3 2.4 11 0v-4M21.5 12v4.2M12 2.5v3m-1.5-1.5h3"/>',
+  write: '<path class="habit-art-fill" d="m4 20 2.3-8.8 7-3.6 3.1 3.1-3.6 7L4 20Z"/><path d="m4 20 2.3-8.8 7-3.6 3.1 3.1-3.6 7L4 20Zm0 0 5.2-5.2m4.1-7.2 3.1-3.1 3.1 3.1-3.1 3.1M6 3v4M4 5h4m9 14h3"/><circle cx="10" cy="14" r="1.1"/>',
+  other: '<circle class="habit-art-fill" cx="12.4" cy="12.6" r="6.4"/><circle cx="12.4" cy="12.6" r="6.4"/><path d="M18 9.5c2.3-.4 3.5-.2 3.8.6.6 1.4-3 4.2-8.1 6.2S4.3 18.8 3.7 17.4c-.3-.7.7-2 2.5-3.3M5 3.2v4.4M2.8 5.4h4.4"/>',
   arrow: '<path d="M4 12h15m-6-6 6 6-6 6"/>',
   down: '<path d="m6 9 6 6 6-6"/>',
   chevron: '<path d="m9 6 6 6-6 6"/>',
@@ -238,13 +238,17 @@ function skillLabel(habit, manage) {
   return `<span>${skill.level ? `Level ${skill.level}` : 'Level 1 after your first session'}${skill.level && skill.next ? ` · ${countLabel(skill.next - skill.sessions, 'session')} to next` : ''}</span>`;
 }
 
+function habitIcon(value) {
+  const category = Object.hasOwn(categories, value) ? value : 'other';
+  return `<span class="habit-icon ${category}">${icon(category, 21)}</span>`;
+}
+
 function row(habit, manage = false) {
   const logged = entry(state, habit.id, selected);
   const editable = route === 'today' && canEditCheckIn(selected, today);
-  const category = categories[habit.category] ? habit.category : 'other';
   const running = state.timer?.id === habit.id;
   return `<li class="habit-row ${logged && !manage ? 'is-done' : ''}" data-habit-row="${habit.id}">
-    <span class="habit-icon ${category}">${icon(category, 21)}</span>
+    ${habitIcon(habit.category)}
     <div class="habit-copy"><strong>${safe(habit.name)}</strong><span>${manage ? `${habit.minutes} min daily${habit.step ? ' · Gradual increase' : ''}` : logged ? `${logged.minutes} min · Completed` : `${habit.minutes} min · Daily`}</span>${skillLabel(habit, manage)}</div>
     ${manage
       ? `<button class="icon-button" data-action="edit" data-id="${habit.id}" aria-label="Edit ${safe(habit.name)}">${icon('chevron', 20)}</button>`
@@ -254,19 +258,31 @@ function row(habit, manage = false) {
   </li>`;
 }
 
+function dailyHabitList(pending, completed) {
+  return `<div class="habit-list daily-habits" data-activity-day="${selected}">
+    ${pending.length ? `<ul class="daily-items pending-habits" aria-label="Pending habits">${pending.map((habit) => row(habit)).join('')}</ul>` : ''}
+    ${completed.length ? `<details class="completed-habits">
+      <summary><span class="completed-symbol">${icon('check', 17)}</span><span>Completed (${completed.length})</span>${icon('down', 17)}</summary>
+      <ul class="daily-items" aria-label="Completed habits">${completed.map((habit) => row(habit)).join('')}</ul>
+    </details>` : ''}
+  </div>`;
+}
+
 function todayScreen() {
   const habits = scheduled(state.habits, selected);
-  const completed = state.logs.filter((log) => log.day === selected).length;
   const visible = selected === today ? habits : state.habits.filter((habit) => habits.includes(habit) || entry(state, habit.id, selected));
+  const { pending, completed } = partitionHabits(visible, state.logs, selected);
   const suggestion = selected === today && habits.find((habit) => nextTarget(state, habit));
-  const allDone = habits.length > 0 && habits.every((habit) => entry(state, habit.id, selected));
-  const currentCount = selected === today ? habits.filter((habit) => entry(state, habit.id, selected)).length : completed;
+  const allDone = visible.length > 0 && pending.length === 0;
+  const list = canEditCheckIn(selected, today)
+    ? dailyHabitList(pending, completed)
+    : `<ul class="habit-list">${visible.map((habit) => row(habit)).join('')}</ul>`;
   const title = selected === today ? 'Daily activities' : selected === shiftDay(today, -1) ? 'Yesterday’s activities' : 'Activity log';
   return `${dateStrip()}<div data-ladder-slot></div>
     <section class="habit-section" aria-labelledby="activity-title">
-      <div class="section-title"><h2 id="activity-title">${title}</h2><span class="completion ${allDone ? 'all-done' : ''}">${allDone ? icon('check', 15) : ''}${currentCount} / ${visible.length} done</span></div>
+      <div class="section-title"><h2 id="activity-title">${title}</h2><span class="completion ${allDone ? 'all-done' : ''}">${allDone ? icon('check', 15) : ''}${completed.length} / ${visible.length} done</span></div>
       ${suggestion ? `<button class="suggestion" data-action="raise" data-id="${suggestion.id}">${icon('up', 16)}<span><strong>${safe(suggestion.name)}</strong> is ready for ${nextTarget(state, suggestion)} min</span>${icon('chevron', 17)}</button>` : ''}
-      ${visible.length ? `<ul class="habit-list">${visible.map((habit) => row(habit)).join('')}</ul>` : `<div class="empty"><p>${selected === today ? 'Make room for one small habit.' : 'No activities scheduled for this day.'}</p>${selected === today ? '<button class="small-action" data-action="add">Add a habit</button>' : ''}</div>`}
+      ${visible.length ? list : `<div class="empty"><p>${selected === today ? 'Make room for one small habit.' : 'No activities scheduled for this day.'}</p>${selected === today ? '<button class="small-action" data-action="add">Add a habit</button>' : ''}</div>`}
     </section>`;
 }
 
@@ -275,7 +291,7 @@ function habitsScreen() {
   const archived = state.habits.filter((habit) => habit.archived);
   return `<section class="habit-section manage-section" aria-labelledby="manage-title"><div class="section-title"><h2 id="manage-title">Your habits</h2><span class="completion">${countLabel(habits.length, 'habit')}</span></div>
     ${habits.length ? `<ul class="habit-list">${habits.map((habit) => row(habit, true)).join('')}</ul>` : '<div class="empty"><p>Start with one activity you can do in five minutes.</p><button class="small-action" data-action="add">Add a habit</button></div>'}
-    ${archived.length ? `<details class="archived"><summary>Archived habits (${archived.length})</summary><ul class="habit-list">${archived.map((habit) => `<li class="habit-row"><div class="habit-copy"><strong>${safe(habit.name)}</strong></div><button class="small-action" data-action="restore" data-id="${habit.id}">Restore</button><button class="icon-button danger" data-action="delete-habit" data-id="${habit.id}" aria-label="Delete ${safe(habit.name)}">${icon('trash', 19)}</button></li>`).join('')}</ul></details>` : ''}
+    ${archived.length ? `<details class="archived"><summary>Archived habits (${archived.length})</summary><ul class="habit-list">${archived.map((habit) => `<li class="habit-row">${habitIcon(habit.category)}<div class="habit-copy"><strong>${safe(habit.name)}</strong></div><button class="small-action" data-action="restore" data-id="${habit.id}">Restore</button><button class="icon-button danger" data-action="delete-habit" data-id="${habit.id}" aria-label="Delete ${safe(habit.name)}">${icon('trash', 19)}</button></li>`).join('')}</ul></details>` : ''}
   </section>`;
 }
 
@@ -346,7 +362,12 @@ function render({ resetScroll = false } = {}) {
   document.querySelector('.top-add').hidden = route === 'progress';
   screen.dataset.route = route;
   const scrollAt = resetScroll ? 0 : (screen.querySelector('.habit-list')?.scrollTop || 0);
+  const expanded = !resetScroll && previousRoute === route &&
+    screen.querySelector('.daily-habits')?.dataset.activityDay === selected &&
+    screen.querySelector('.completed-habits')?.open;
   screen.innerHTML = ({ today: todayScreen, habits: habitsScreen, progress: progressScreen })[route]();
+  const completedSection = screen.querySelector('.completed-habits');
+  if (expanded && completedSection) completedSection.open = true;
   if (route === 'today') {
     const slot = screen.querySelector('[data-ladder-slot]');
     if (existingLadder) slot.replaceWith(existingLadder);
@@ -421,7 +442,7 @@ function openPicker(trigger) {
   picker.innerHTML = `<div class="sheet-body">
     <div class="sheet-header"><h2 id="picker-title">${label}</h2><button class="icon-button" data-picker-close type="button" aria-label="Close options">${icon('close')}</button></div>
     <ul class="picker-options">${options.map(([id, text]) => `<li>
-      <button type="button" data-option="${id}" aria-pressed="${id === selectedValue}">${text}${icon('check', 19)}</button>
+      <button type="button" data-option="${id}" aria-pressed="${id === selectedValue}">${trigger.dataset.picker === 'category' ? habitIcon(id) : ''}<span class="option-label">${text}</span>${icon('check', 19)}</button>
     </li>`).join('')}</ul>
   </div>`;
   picker.showModal();
@@ -537,7 +558,13 @@ function complete(habit, { fromTimer = false, day = today } = {}) {
   let message = golden ? 'Golden step added!' : day === today ? 'Session logged. Flight advanced.' : 'Yesterday’s session logged.';
   if (afterSkill > beforeSkill) message += ` · Skill level ${afterSkill}`;
   say(message, true);
-  screen.querySelector(`[data-action="toggle"][data-id="${habit.id}"]`)?.focus({ preventScroll: true });
+  if (route === 'today' && selected === day) {
+    const completedSection = screen.querySelector('.completed-habits');
+    const nextControl = completedSection?.open
+      ? completedSection.querySelector(`[data-action="toggle"][data-id="${habit.id}"]`)
+      : screen.querySelector('.pending-habits [data-action="toggle"]');
+    (nextControl ?? completedSection?.querySelector('summary'))?.focus({ preventScroll: true });
+  }
 }
 
 function removeCompletion(id, day) {
@@ -547,6 +574,9 @@ function removeCompletion(id, day) {
   if (undoLog?.id === id && undoLog.day === day) undoLog = null;
   render();
   say('Session removed.');
+  if (route === 'today' && selected === day) {
+    screen.querySelector(`[data-action="toggle"][data-id="${id}"]`)?.focus();
+  }
   return true;
 }
 
@@ -747,8 +777,7 @@ document.addEventListener('click', (event) => {
       const day = trigger.dataset.checkInDay;
       if (!habit || day !== selected || !canEditCheckIn(day, today)) return;
       if (entry(state, id, day)) {
-        if (!removeCompletion(id, day)) return;
-        screen.querySelector(`[data-action="toggle"][data-id="${id}"]`)?.focus({ preventScroll: true });
+        removeCompletion(id, day);
       } else {
         complete(habit, { day });
       }

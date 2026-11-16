@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { dayKey, scheduled, logSession, removeLog, deleteHabit, entry, nextTarget, dayCompletion, remaining, weekDays, mergeBackup, zoneIndex, zones, nextDestination, canEditCheckIn, checkInDays, weeklyGoalProgress, skyPhase, timerProgress, moveRocket } from '../dist/model.mjs';
+import { dayKey, scheduled, partitionHabits, logSession, removeLog, deleteHabit, entry, nextTarget, dayCompletion, remaining, weekDays, mergeBackup, zoneIndex, zones, nextDestination, canEditCheckIn, checkInDays, weeklyGoalProgress, skyPhase, timerProgress, moveRocket } from '../dist/model.mjs';
 
 test('date helpers give predictable local dates', () => {
   assert.equal(dayKey(new Date(2026, 10, 15, 12)), '2026-11-15');
@@ -22,6 +22,25 @@ test('selected weekdays only show on matching dates', () => {
 test('archived and paused periods do not appear in schedule', () => {
   assert.equal(scheduled([{id:'a',created:'2026-11-01',archived:'2026-11-12'}],'2026-11-15').length,0);
   assert.equal(scheduled([{id:'b',created:'2026-11-01',inactivePeriods:[{from:'2026-11-14'}]}],'2026-11-15').length,0);
+});
+
+test('daily list groups pending first and retains each group’s original order', () => {
+  const day = '2026-11-16';
+  const habits = ['first', 'second', 'third', 'fourth'].map((id) => ({ id }));
+  const logs = [
+    { id: 'fourth', day },
+    { id: 'second', day },
+    { id: 'first', day: '2026-11-15' },
+    { id: 'archived', day },
+  ];
+
+  assert.deepEqual(partitionHabits(habits, logs, day), {
+    pending: [habits[0], habits[2]],
+    completed: [habits[1], habits[3]],
+  });
+  assert.deepEqual(partitionHabits([], logs, day), { pending: [], completed: [] });
+  assert.deepEqual(partitionHabits([habits[1]], logs, day), { pending: [], completed: [habits[1]] });
+  assert.deepEqual(partitionHabits(habits, [], day), { pending: habits, completed: [] });
 });
 
 test('completions are unique per habit/day and reversible', () => {

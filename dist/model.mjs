@@ -50,6 +50,16 @@ export function scheduled(habits, day) {
   );
 }
 
+export function partitionHabits(habits, logs, day) {
+  const completedIds = new Set(logs.filter((log) => log.day === day).map((log) => log.id));
+  const pending = [];
+  const completed = [];
+  for (const habit of habits) {
+    (completedIds.has(habit.id) ? completed : pending).push(habit);
+  }
+  return { pending, completed };
+}
+
 export function entry(state, id, day) {
   return state.logs.find((log) => log.id === id && log.day === day);
 }

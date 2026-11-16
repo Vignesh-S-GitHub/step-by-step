@@ -162,14 +162,24 @@ h1{font-size:40px;line-height:1.08;font-weight:740;letter-spacing:-.035em}
 .completion{display:inline-flex;align-items:center;gap:4px;white-space:nowrap;color:var(--muted);font-size:12px;font-weight:620}
 .all-done{color:var(--mint)}
 .habit-list{margin:0;padding:0;list-style:none;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);overflow:auto;scrollbar-width:thin;scrollbar-color:var(--highlight-border) transparent}
+.daily-items{margin:0;padding:0;list-style:none}
+.daily-items+.completed-habits{border-top:1px solid var(--line)}
+.completed-habits[open]>summary{border-bottom:1px solid var(--line)}
+.completed-habits>summary{display:flex;align-items:center;gap:10px;min-height:48px;padding:8px 13px;list-style:none;cursor:pointer;color:var(--ink);background:color-mix(in srgb,var(--surface) 78%,var(--accent-deep));font-size:.9rem;font-weight:650;outline-offset:-4px}
+.completed-habits>summary::-webkit-details-marker{display:none}
+.completed-habits>summary>svg{margin-left:auto;color:var(--accent);flex:none}
+.completed-habits[open]>summary>svg{transform:rotate(180deg)}
+.completed-symbol{width:24px;height:24px;display:grid;flex:none;place-items:center;border:1px solid color-mix(in srgb,var(--mint) 40%,transparent);border-radius:50%;color:var(--mint);background:color-mix(in srgb,var(--mint) 12%,transparent)}
+@media(hover:hover){.completed-habits>summary:hover{background:var(--raised)}}
 .habit-row{display:flex;align-items:center;gap:12px;min-height:70px;padding:10px 13px}
 .habit-row+.habit-row{border-top:1px solid var(--line)}
-.habit-icon{width:39px;height:39px;display:grid;flex:none;place-items:center;border-radius:10px;background:var(--accent-deep);color:var(--accent)}
-.habit-icon.movement{background:color-mix(in srgb,var(--surface) 82%,var(--habit-movement));color:color-mix(in srgb,var(--accent) 24%,var(--habit-movement))}
-.habit-icon.read{background:color-mix(in srgb,var(--surface) 82%,var(--habit-read));color:color-mix(in srgb,var(--accent) 24%,var(--habit-read))}
-.habit-icon.calm{background:color-mix(in srgb,var(--surface) 82%,var(--habit-calm));color:color-mix(in srgb,var(--accent) 24%,var(--habit-calm))}
-.habit-icon.learn{background:color-mix(in srgb,var(--surface) 82%,var(--habit-learn));color:color-mix(in srgb,var(--accent) 24%,var(--habit-learn))}
-.habit-icon.write{background:color-mix(in srgb,var(--surface) 82%,var(--habit-write));color:color-mix(in srgb,var(--accent) 24%,var(--habit-write))}
+.habit-icon{--habit-color:var(--accent);width:39px;height:39px;display:grid;flex:none;place-items:center;border:1px solid color-mix(in srgb,var(--habit-color) 32%,transparent);border-radius:10px;background:radial-gradient(ellipse at 30% 16%,color-mix(in srgb,var(--habit-color) 29%,var(--surface)),var(--accent-deep) 90%);color:color-mix(in srgb,var(--habit-color) 86%,var(--ink))}
+.habit-icon.movement{--habit-color:var(--habit-movement)}
+.habit-icon.read{--habit-color:var(--habit-read)}
+.habit-icon.calm{--habit-color:var(--habit-calm)}
+.habit-icon.learn{--habit-color:var(--habit-learn)}
+.habit-icon.write{--habit-color:var(--habit-write)}
+.habit-art-fill{fill:currentColor;fill-opacity:.17;stroke:none}
 .habit-copy{display:grid;gap:2px;flex:1;min-width:0}
 .habit-copy strong{font-size:14px;font-weight:680;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .habit-copy span{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -260,9 +270,11 @@ input::placeholder{color:var(--muted)}
 .option-picker::backdrop{background:color-mix(in srgb,var(--bg) 52%,transparent)}
 .picker-options{display:grid;gap:5px;margin:0;padding:0;list-style:none}
 .picker-options button{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:46px;padding:8px 12px;border:1px solid var(--line);border-radius:9px;background:var(--field);color:var(--ink);font-weight:630;text-align:left;outline-offset:-3px}
-.picker-options button svg{visibility:hidden}
+.picker-options .habit-icon{width:32px;height:32px}
+.picker-options .option-label{flex:1}
+.picker-options button>svg{visibility:hidden}
 .picker-options button[aria-pressed="true"]{border-color:var(--accent);background:var(--action);color:var(--on-accent);outline-color:var(--on-accent)}
-.picker-options button[aria-pressed="true"] svg{visibility:visible}
+.picker-options button[aria-pressed="true"]>svg{visibility:visible}
 @media(hover:hover){.picker-options button[aria-pressed="false"]:hover,.picker-trigger:hover{background:var(--raised)}}
 .weekday-field{padding:0;margin:3px 0 5px;min-width:0;border:0}
 .weekday-field legend{font-size:12px;font-weight:650;color:var(--ink);margin-bottom:9px}
