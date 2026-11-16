@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { dayKey, scheduled, logSession, removeLog, deleteHabit, entry, nextTarget, dayCompletion, remaining, weekDays, mergeBackup, zoneIndex, zones, nextDestination, canEditCheckIn, checkInDays, weeklyGoalProgress, flightTrailSteps, skyPhase, timerProgress } from '../dist/model.mjs';
+import { dayKey, scheduled, logSession, removeLog, deleteHabit, entry, nextTarget, dayCompletion, remaining, weekDays, mergeBackup, zoneIndex, zones, nextDestination, canEditCheckIn, checkInDays, weeklyGoalProgress, flightTrailSteps, skyPhase, timerProgress, moveRocket } from '../dist/model.mjs';
 
 test('date helpers give predictable local dates', () => {
   assert.equal(dayKey(new Date(2026, 10, 15, 12)), '2026-11-15');
@@ -147,4 +147,14 @@ test('habit ring tracks elapsed timer fraction, including paused and expired tim
   assert.equal(timerProgress({ ...timer, endsAt: null }, 30000), .25);
   assert.equal(timerProgress(timer, 62000), 1);
   assert.equal(timerProgress(timer, -10000), 0);
+});
+
+test('rocket follows horizontal and vertical drags within its flight card', () => {
+  const center = { x: 0, y: 0 };
+  const moved = moveRocket(center, -40, 12, 400, 200);
+  assert.deepEqual(moved, { x: -.1, y: .06 });
+  assert.deepEqual(moveRocket(moved, 40, -12, 400, 200), center);
+  assert.deepEqual(moveRocket(center, -900, 900, 400, 200), { x: -.22, y: .16 });
+  assert.deepEqual(moveRocket(center, 900, -900, 400, 200), { x: .18, y: -.12 });
+  assert.equal(moveRocket(center, 20, 20, 0, 0), center);
 });

@@ -219,7 +219,7 @@ function ladderCard() {
       <p class="ladder-next" data-ladder-next hidden>${icon('planet', 13)} <span></span></p>
     </div>
     <button class="icon-button ladder-route" data-action="ladder-info" aria-label="Cosmic Flight journey">${icon('spark', 18)}</button>
-    <span class="ladder-guide" id="ladder-controls">${icon('rotate', 13)} Drag to rotate</span>
+    <span class="ladder-guide" id="ladder-controls">${icon('rotate', 13)} Drag to move</span>
   </section>`;
 }
 

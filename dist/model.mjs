@@ -221,3 +221,11 @@ export function remaining(timer, now = Date.now()) {
 export function timerProgress(timer, now = Date.now()) {
   return Math.min(1, Math.max(0, 1 - remaining(timer, now) / (timer.minutes * 60000)));
 }
+
+export function moveRocket(position, dx, dy, width, height) {
+  if (!width || !height) return position;
+  return {
+    x: Math.max(-.22, Math.min(.18, position.x + dx / width)),
+    y: Math.max(-.12, Math.min(.16, position.y + dy / height)),
+  };
+}

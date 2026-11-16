@@ -1,4 +1,4 @@
-import { normalizeGoldenSteps, stepsPerZone, zoneIndex, zones } from './model.mjs';
+import { normalizeGoldenSteps, stepsPerZone, zoneIndex, zones, moveRocket } from './model.mjs';
 
 const threeUrl = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.1/three.module.min.js';
 const spacing = .49;
@@ -102,6 +102,58 @@ function previewZone() {
   return Number.isInteger(zone) && zone >= 1 && zone <= zones.length ? zone - 1 : null;
 }
 
+// Both renderers share touch, mouse and keyboard handling and the same movement bounds.
+function bindFlightControls(stage, options, { draw, turn, hitRocket, pulse, center }) {
+  let drag;
+  let position = { x: 0, y: 0 };
+
+  function move(dx, dy) {
+    const { width, height } = stage.getBoundingClientRect();
+    position = moveRocket(position, dx, dy, width, height);
+    turn(dx, dy);
+    draw();
+  }
+
+  stage.addEventListener('pointerdown', (event) => {
+    if (drag || event.button !== 0) return;
+    drag = { id: event.pointerId, x: event.clientX, y: event.clientY, moved: false };
+    stage.setPointerCapture(event.pointerId);
+  }, options);
+
+  stage.addEventListener('pointermove', (event) => {
+    if (event.pointerId !== drag?.id) return;
+    const dx = event.clientX - drag.x, dy = event.clientY - drag.y;
+    if (!drag.moved && Math.hypot(dx, dy) < 3) return;
+    Object.assign(drag, { x: event.clientX, y: event.clientY, moved: true });
+    stage.classList.add('is-dragging');
+    move(dx, dy);
+  }, options);
+
+  function finish(event) {
+    if (event.pointerId !== drag?.id) return;
+    if (!drag.moved && event.type === 'pointerup' && hitRocket(event)) pulse();
+    drag = undefined;
+    stage.classList.remove('is-dragging');
+    draw();
+  }
+
+  for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) stage.addEventListener(type, finish, options);
+  stage.addEventListener('click', (event) => { if (event.detail === 0) pulse(); }, options);
+  stage.addEventListener('keydown', (event) => {
+    const directions = { ArrowLeft: [-14, 0], ArrowRight: [14, 0], ArrowUp: [0, -9], ArrowDown: [0, 9] };
+    if (event.key === 'Home') {
+      position = { x: 0, y: 0 };
+      center();
+      draw();
+    } else if (Object.hasOwn(directions, event.key)) {
+      move(...directions[event.key]);
+    } else return;
+    event.preventDefault();
+  }, options);
+
+  return { get dragging() { return Boolean(drag); }, get position() { return position; } };
+}
+
 export function mount(container) {
   let total = 0;
   let golden = [];
@@ -122,7 +174,7 @@ export function mount(container) {
         : total.toLocaleString() + (total === 1 ? ' step' : ' steps');
     }
     container.dataset.zone = String(zoneIndex(sceneCount()));
-    stage.setAttribute('aria-label', 'Cosmic Flight, ' + (debug === null ? zone.name : zones[debug].name || '') + ' ' + total + ' steps. Drag or use arrow keys to rotate. Press Enter to pulse.');
+    stage.setAttribute('aria-label', 'Cosmic Flight, ' + (debug === null ? zone.name : zones[debug].name || '') + ' ' + total + ' steps. Drag or use arrow keys to move. Press Home to center or Enter to pulse.');
   }
   updateLabels();
   threePromise ??= import(threeUrl).catch((error) => { threePromise = undefined; throw error; });
@@ -461,13 +513,14 @@ function createView(T, stage) {
   const actorTo = new T.Vector3();
   const actorPoint = new T.Vector3();
   const cameraTarget = new T.Vector3();
+  const cameraRight = new T.Vector3(), cameraUp = new T.Vector3();
   const sky = new T.Color(), horizon = new T.Color(), nextSky = new T.Color(), themeSky = new T.Color();
   const themeBase = new T.Color(), themeHighlight = new T.Color(), themeEdge = new T.Color();
   const paletteColors = scenicSkies.map((color) => new T.Color(color));
   let themeName, frame = 0, last = 0, elapsed = 0, seen = true, lost = false;
   let lastTop, lastHorizon;
   let total = 0, followed = 0, goldenSet = new Set(), jumping, pulsing;
-  let angle = .63, targetAngle = angle, tilt = .23, targetTilt = tilt, drag;
+  let angle = .63, targetAngle = angle, tilt = .23, targetTilt = tilt;
 
   const warmPlume = new T.Color(0xff933f);
   const warmFlame = new T.Color(0xffe7a5);
@@ -569,7 +622,20 @@ function createView(T, stage) {
     const boost = Math.max(0, 1 - Math.min(time, pulseTime) / .92);
     const lift = time < .96 ? Math.sin(Math.PI * smooth(time / .96)) * .93 : 0;
     const bob = reduced.matches ? 0 : Math.sin(elapsed * 2.2) * .067;
-    actorTo.set(.16, followed * spacing + .37, .20);
+    const radius = 8.8 + Math.min(1.1, Math.log1p(total) * .24);
+    const nudge = time < .6 ? Math.sin(time / .6 * Math.PI) * .13 : 0;
+    camera.position.set(Math.sin(angle) * radius, followed * spacing + tilt * radius + nudge, Math.cos(angle) * radius);
+    cameraTarget.set(0, followed * spacing + .08, 0);
+    camera.lookAt(cameraTarget);
+    camera.updateMatrixWorld();
+    cameraRight.setFromMatrixColumn(camera.matrixWorld, 0);
+    cameraUp.setFromMatrixColumn(camera.matrixWorld, 1);
+    const screenHeight = 2 * radius * Math.tan(T.MathUtils.degToRad(camera.fov / 2));
+    const screenWidth = screenHeight * camera.aspect;
+    const { x, y } = controls.position;
+    actorTo.set(.16, followed * spacing + .37, .20)
+      .addScaledVector(cameraRight, x * screenWidth)
+      .addScaledVector(cameraUp, -y * screenHeight);
     actorPoint.copy(actorTo);
     actorPoint.x += .20 * lift;
     actorPoint.y += bob + lift;
@@ -598,11 +664,6 @@ function createView(T, stage) {
     const shooting = elapsed % 17;
     shootingStar.visible = !reduced.matches && shooting > 13 && shooting < 14;
     shootingStar.position.set(-12 + (shooting - 13) * 23, followed * spacing + 7 - (shooting - 13) * 6, -15);
-    const radius = 8.8 + Math.min(1.1, Math.log1p(total) * .24);
-    const nudge = time < .6 ? Math.sin(time / .6 * Math.PI) * .13 : 0;
-    camera.position.set(Math.sin(angle) * radius, followed * spacing + tilt * radius + nudge, Math.cos(angle) * radius);
-    cameraTarget.set(0, followed * spacing + .08, 0);
-    camera.lookAt(cameraTarget);
     renderer.render(scene, camera);
   }
 
@@ -614,7 +675,7 @@ function createView(T, stage) {
       last = now;
       if (!reduced.matches) {
         elapsed += dt;
-        if (!drag) targetAngle += dt * .085;
+        if (!controls.dragging) targetAngle += dt * .085;
         angle += (targetAngle - angle) * (1 - Math.exp(-dt * 7));
         tilt += (targetTilt - tilt) * (1 - Math.exp(-dt * 7));
         followed += (total - followed) * (1 - Math.exp(-dt * 4.15));
@@ -678,55 +739,28 @@ function createView(T, stage) {
     stage.removeAttribute('aria-disabled');
     start();
   }, options);
-  stage.addEventListener('pointerdown', (event) => {
-    if (drag || event.button !== 0) return;
-    drag = { id: event.pointerId, x: event.clientX, y: event.clientY, moved: false };
-    stage.setPointerCapture(event.pointerId);
-  }, options);
-  stage.addEventListener('pointermove', (event) => {
-    if (event.pointerId !== drag?.id) return;
-    const dx = event.clientX - drag.x, dy = event.clientY - drag.y;
-    if (!drag.moved && Math.hypot(dx, dy) < 5) return;
-    targetAngle -= dx * .012;
-    targetTilt = clamp(targetTilt + dy * .006, -.26, .68);
-    Object.assign(drag, { x: event.clientX, y: event.clientY, moved: true });
-    stage.classList.add('is-dragging');
-    start();
-  }, options);
-  function endDrag(event) {
-    if (event.pointerId !== drag?.id) return;
-    if (!drag.moved && event.type === 'pointerup') {
-      // Test the tap against the rocket's projected center rather than the whole landscape.
+  const controls = bindFlightControls(stage, options, {
+    draw: start,
+    turn(dx, dy) {
+      targetAngle -= dx * .006;
+      targetTilt = clamp(targetTilt + dy * .002, -.26, .68);
+    },
+    hitRocket(event) {
       const rect = stage.getBoundingClientRect();
       scratch.copy(actor.position).project(camera);
       const x = rect.left + (scratch.x + 1) * rect.width / 2;
       const y = rect.top + (1 - scratch.y) * rect.height / 2;
-      if (Math.hypot(event.clientX - x, event.clientY - y) < 38) pulse();
-    }
-    drag = undefined;
-    stage.classList.remove('is-dragging');
-  }
-  for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) stage.addEventListener(type, endDrag, options);
-  function pulse() {
-    if (!reduced.matches) pulsing = elapsed;
-    start();
-  }
-  stage.addEventListener('click', (event) => {
-    if (event.detail === 0) pulse();
-  }, options);
-  stage.addEventListener('keydown', (event) => {
-    const { key } = event;
-    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home'].includes(key)) return;
-    if (key === 'Home') {
+      return Math.hypot(event.clientX - x, event.clientY - y) < 40;
+    },
+    pulse() {
+      if (!reduced.matches) pulsing = elapsed;
+      start();
+    },
+    center() {
       targetAngle = .63;
       targetTilt = .23;
-    } else {
-      targetAngle += key === 'ArrowLeft' ? .24 : key === 'ArrowRight' ? -.24 : 0;
-      targetTilt = clamp(targetTilt + (key === 'ArrowUp' ? .08 : key === 'ArrowDown' ? -.08 : 0), -.26, .68);
-    }
-    event.preventDefault();
-    start();
-  }, options);
+    },
+  });
 
   return {
     sync(count, golden, animate, warp = false) {
@@ -789,7 +823,7 @@ function createCanvasFallback(stage) {
   const options = { signal: events.signal };
   const dust = Array.from({ length: 115 }, (_, i) => [hash(i, 621), hash(i, 622), hash(i, 623), hash(i, 624)]);
   let width = 0, height = 0, frame = 0, last = 0, time = 0, visible = true;
-  let count = 0, change, pulse, angle = .48, drag;
+  let count = 0, change, pulse, angle = .48;
   let rocketX = 0, rocketY = 0;
 
   function halo(x, y, radius, color, opacity) {
@@ -1039,12 +1073,13 @@ function createCanvasFallback(stage) {
     ctx.globalAlpha = 1;
 
     const boost = 1 - smooth(Math.min(age, pulse === undefined ? 2 : time - pulse) / .92);
-    const toX = center + Math.sin(angle) * unit * .071;
-    const toY = height * .44;
+    const { x, y } = controls.position;
+    const toX = center + x * width + Math.sin(angle) * unit * .035;
+    const toY = height * (.44 + y);
     const lift = age < 1 ? Math.sin(Math.PI * smooth(age)) * unit * .18 : 0;
     rocketX = toX + lift * .24;
     rocketY = toY - lift - Math.sin(time * 2.35) * unit * .02;
-    drawRocket(rocketX, rocketY, unit * .0075, palette, boost, change?.golden && age < 1.1);
+    drawRocket(rocketX, rocketY, unit * .0062, palette, boost, change?.golden && age < 1.1);
     const ring = Math.min(age, pulse === undefined ? 2 : time - pulse);
     if (ring < .8) {
       ctx.globalAlpha = (1 - ring / .8) * .68;
@@ -1081,7 +1116,7 @@ function createCanvasFallback(stage) {
       last = now;
       if (!reduced.matches) {
         time += delta;
-        if (!drag) angle += delta * .09;
+        if (!controls.dragging) angle += delta * .09;
       }
       draw();
     }
@@ -1107,34 +1142,20 @@ function createCanvasFallback(stage) {
   appearance.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
   document.addEventListener('visibilitychange', () => document.hidden ? stop() : start(), options);
   reduced.addEventListener('change', () => { if (reduced.matches) { change = undefined; pulse = undefined; } start(); }, options);
-  stage.addEventListener('pointerdown', (event) => {
-    if (event.button || drag) return;
-    drag = { id: event.pointerId, x: event.clientX, moved: false };
-    stage.setPointerCapture(event.pointerId);
-  }, options);
-  stage.addEventListener('pointermove', (event) => {
-    if (event.pointerId !== drag?.id || Math.abs(event.clientX - drag.x) < 3) return;
-    drag.moved = true;
-    angle += (event.clientX - drag.x) * .016;
-    drag.x = event.clientX;
-    start();
-  }, options);
-  function finish(event) {
-    if (event.pointerId !== drag?.id) return;
-    const rect = stage.getBoundingClientRect();
-    if (event.type === 'pointerup' && !drag.moved && !reduced.matches &&
-        Math.hypot(event.clientX - rect.left - rocketX, event.clientY - rect.top - rocketY) < 40) pulse = time;
-    drag = undefined;
-    start();
-  }
-  for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) stage.addEventListener(type, finish, options);
-  stage.addEventListener('click', (event) => { if (!event.detail && !reduced.matches) { pulse = time; start(); } }, options);
-  stage.addEventListener('keydown', (event) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home'].includes(event.key)) return;
-    angle = event.key === 'Home' ? .48 : angle + (event.key === 'ArrowLeft' ? -.26 : .26);
-    event.preventDefault();
-    start();
-  }, options);
+  const controls = bindFlightControls(stage, options, {
+    draw: start,
+    turn(dx) { angle += dx * .010; },
+    hitRocket(event) {
+      const rect = stage.getBoundingClientRect();
+      return Math.hypot(event.clientX - rect.left - rocketX, event.clientY - rect.top - rocketY) < 40;
+    },
+    pulse() {
+      if (!reduced.matches) pulse = time;
+      start();
+    },
+    center() { angle = .48; },
+  });
+
   return {
     sync(next, golden, animate, warp) {
       count = next;
