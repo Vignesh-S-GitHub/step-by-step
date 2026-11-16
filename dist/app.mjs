@@ -288,7 +288,7 @@ function weeklyGoalCard() {
   return `<section class="weekly-goal" aria-labelledby="weekly-goal-title">
     ${progress ? `<div class="goal-ring" role="progressbar" aria-label="Days logged this week"
       aria-valuemax="${progress.target}" aria-valuenow="${Math.min(progress.days, progress.target)}"
-      aria-valuetext="${progress.days} days logged, goal ${progress.target}" style="--goal-turn:${Math.min(1, progress.days / progress.target)}turn">
+      aria-valuetext="${countLabel(progress.days, 'day')} logged, goal ${progress.target}" style="--goal-turn:${Math.min(1, progress.days / progress.target)}turn">
       <span aria-hidden="true">${met ? icon('check', 19) : `${progress.days}/${progress.target}`}</span>
     </div>` : ''}
     <div class="goal-copy"><h2 id="weekly-goal-title">Weekly goal</h2><p>${detail}</p></div>
